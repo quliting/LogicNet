@@ -13,3 +13,5 @@ global using Microsoft.AspNetCore.Mvc;
 global using Microsoft.CodeAnalysis;
 global using System.ComponentModel.DataAnnotations;
 global using SqlSugar;
+global using Yitter.IdGenerator;
+global using Lazy.Captcha.Core;

@@ -4,16 +4,5 @@
         <name>LogicNet.Application</name>
     </assembly>
     <members>
-        <member name="T:LogicNet.Application.SystemAppService">
-            <summary>
-            系统服务接口
-            </summary>
-        </member>
-        <member name="M:LogicNet.Application.SystemAppService.GetDescription">
-            <summary>
-            获取系统描述
-            </summary>
-            <returns></returns>
-        </member>
     </members>
 </doc>
