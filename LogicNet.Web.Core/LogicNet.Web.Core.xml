@@ -4,5 +4,65 @@
         <name>LogicNet.Web.Core</name>
     </assembly>
     <members>
+        <member name="P:LogicNet.Web.Core.TemplateRestfulResult`1.Data">
+            <summary>
+                数据
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.TemplateRestfulResult`1.Succeeded">
+            <summary>
+                执行成功
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.TemplateRestfulResult`1.Errors">
+            <summary>
+                错误信息
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.TemplateRestfulResult`1.Extras">
+            <summary>
+                附加数据
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.TemplateRestfulResult`1.Timestamp">
+            <summary>
+                时间戳
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.TemplateRestfulResultProvider.OnException(Microsoft.AspNetCore.Mvc.Filters.ExceptionContext,Furion.FriendlyException.ExceptionMetadata)">
+            <summary>
+                异常返回值
+            </summary>
+            <param name="context"></param>
+            <param name="metadata"></param>
+            <returns></returns>
+        </member>
+        <member name="M:LogicNet.Web.Core.TemplateRestfulResultProvider.OnSucceeded(Microsoft.AspNetCore.Mvc.Filters.ActionExecutedContext,System.Object)">
+            <summary>
+                成功返回值
+            </summary>
+            <param name="context"></param>
+            <param name="data"></param>
+            <returns></returns>
+        </member>
+        <member name="M:LogicNet.Web.Core.TemplateRestfulResultProvider.OnResponseStatusCodes(Microsoft.AspNetCore.Http.HttpContext,System.Int32,Furion.UnifyResult.UnifyResultSettingsOptions)">
+            <summary>
+                特定状态码返回值
+            </summary>
+            <param name="context"></param>
+            <param name="statusCode"></param>
+            <param name="unifyResultSettings"></param>
+            <returns></returns>
+        </member>
+        <member name="M:LogicNet.Web.Core.TemplateRestfulResultProvider.LogicRESTfulResult(System.Int32,System.Boolean,System.Object,System.Object)">
+            <summary>
+                返回 RESTful 风格结果集
+            </summary>
+            <param name="statusCode"></param>
+            <param name="succeeded"></param>
+            <param name="data"></param>
+            <param name="errors"></param>
+            <returns></returns>
+        </member>
     </members>
 </doc>
