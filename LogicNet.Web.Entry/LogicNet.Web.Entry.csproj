@@ -11,6 +11,10 @@
 	<ItemGroup>
 		<ProjectReference Include="..\LogicNet.Web.Core\LogicNet.Web.Core.csproj" />
 	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="新文件夹\" />
+	</ItemGroup>
 	<ProjectExtensions>
 		<VisualStudio>
 			<UserProperties properties_4launchsettings_1json__JsonSchema="" />
