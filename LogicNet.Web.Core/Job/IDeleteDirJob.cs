@@ -15,7 +15,8 @@ public class DeleteDirJob : IJob
         var directories = App.GetConfig<string>("AppSettings:DeleteDirectory")
             .Split(",", StringSplitOptions.RemoveEmptyEntries);
 
-        foreach (var directory in directories.Select(dir => dir.AsDirectory()))
+        foreach (var directory in directories.Select(dir =>
+                     Path.Combine(App.WebHostEnvironment.WebRootPath, dir).AsDirectory()))
         {
             var expiredFiles = directory.GetFiles()
                 .Where(file => DateTime.Now - file.CreationTime > TimeSpan.FromMinutes(10));
