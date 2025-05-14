@@ -32,6 +32,28 @@
     "Host": "https://localhost:5001/",
     "DeleteDirectory": "Temp"
   },
+  "JWTSettings": {
+    "ValidateIssuerSigningKey": true,
+    "IssuerSigningKey": "MIGfMA0GCSeqweqdasdaseqweweqweqwedfQjb5H3K3PNwIDAQAB",
+    "ValidateIssuer": false,
+    "ValidIssuer": "qlt",
+    "ValidateAudience": false,
+    "ValidAudience": "qlt",
+    "ValidateLifetime": true,
+    "ExpiredTime":99,
+    "ClockSkew": 1,
+    "Algorithm": "HS256",
+    "ModelToQuery": true
+  },
+  "DynamicApiControllerSettings": {
+    "DefaultRoutePrefix": "Api",
+    "KeepName": true,
+    "UrlParameterization": true,
+    "KeepVerb": true,
+    "SupportedMvcController": true,
+    "LowercaseRoute": false,
+    "ModelToQuery": true
+  },
   // 验证码配置
   "CaptchaOptions": {
     "CaptchaType": 5,

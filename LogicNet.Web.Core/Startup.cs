@@ -1,5 +1,9 @@
 ﻿using System;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Furion;
+using Furion.JsonSerialization;
 using Furion.Schedule;
 using LogicNet.Web.Core.Job;
 using Microsoft.AspNetCore.Builder;
@@ -20,7 +24,21 @@ public class Startup : AppStartup
 
         services.AddCorsAccessor();
 
-        services.AddControllers()
+        services.AddControllers().AddJsonOptions(item =>
+            { 
+                item.JsonSerializerOptions.AllowTrailingCommas = true;
+                // item.JsonSerializerOptions.Converters.Add(new SystemTextJsonStringToEnumJsonConverter());
+                // item.JsonSerializerOptions.Converters.Add(new SystemTextJsonStringToNullJsonConverter());
+                // item.JsonSerializerOptions.Converters.Add(new SystemTextJsonStringToJsonConverter());
+                item.JsonSerializerOptions.Converters.AddDateTimeTypeConverters("yyyy-MM-dd");
+                item.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
+                // item.JsonSerializerOptions.Converters.Add(new SystemTextJsonStringToBoolJsonConverter());
+                // item.JsonSerializerOptions.Converters.Add(new SystemTextJsonStringToPriceJsonConverter());
+                item.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: true));
+                item.JsonSerializerOptions.Converters.Add(new SystemTextJsonDateTimeOffsetJsonConverter());
+                item.JsonSerializerOptions.PropertyNamingPolicy = null;
+                item.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+            })
             .AddInjectWithUnifyResult();
 
         YitIdHelper.SetIdGenerator(new IdGeneratorOptions()
