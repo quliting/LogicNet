@@ -13,6 +13,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <Folder Include="wwwroot\Temp\" />
 	  <Folder Include="新文件夹\" />
 	</ItemGroup>
 	<ProjectExtensions>
