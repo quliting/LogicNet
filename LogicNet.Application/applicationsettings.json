@@ -1,7 +1,7 @@
 ﻿{
   "$schema": "https://gitee.com/dotnetchina/Furion/raw/v4/schemas/v4/furion-schema.json",
   "SpecificationDocumentSettings": {
-    "DocumentTitle": "Furion | 规范化接口",
+    "DocumentTitle": "Logic Swagger",
     "GroupOpenApiInfos": [
       {
         "Group": "Default",
@@ -28,10 +28,12 @@
       "environment"
     ]
   },
+  //项目的配置信息
   "AppSettings": {
     "Host": "https://localhost:5001/",
     "DeleteDirectory": "Temp"
   },
+  //JWT的配置
   "JWTSettings": {
     "ValidateIssuerSigningKey": true,
     "IssuerSigningKey": "MIGfMA0GCSeqweqdasdaseqweweqweqwedfQjb5H3K3PNwIDAQAB",
@@ -40,7 +42,7 @@
     "ValidateAudience": false,
     "ValidAudience": "qlt",
     "ValidateLifetime": true,
-    "ExpiredTime":99,
+    "ExpiredTime": 99,
     "ClockSkew": 1,
     "Algorithm": "HS256",
     "ModelToQuery": true

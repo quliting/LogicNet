@@ -25,7 +25,7 @@ public class Startup : AppStartup
         services.AddCorsAccessor();
 
         services.AddControllers().AddJsonOptions(item =>
-            { 
+            {
                 item.JsonSerializerOptions.AllowTrailingCommas = true;
                 // item.JsonSerializerOptions.Converters.Add(new SystemTextJsonStringToEnumJsonConverter());
                 // item.JsonSerializerOptions.Converters.Add(new SystemTextJsonStringToNullJsonConverter());
@@ -38,6 +38,9 @@ public class Startup : AppStartup
                 item.JsonSerializerOptions.Converters.Add(new SystemTextJsonDateTimeOffsetJsonConverter());
                 item.JsonSerializerOptions.PropertyNamingPolicy = null;
                 item.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+            }).AddInjectWithUnifyResult<TemplateRestfulResultProvider>(item =>
+            {
+                item.ConfigureSwaggerGen(gen => { gen.CustomSchemaIds(s => s.FullName?.Replace("+", ".")); });
             })
             .AddInjectWithUnifyResult();
 
