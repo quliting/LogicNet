@@ -12,11 +12,19 @@ public class DeleteDirJob : IJob
 {
     public Task ExecuteAsync(JobExecutingContext context, CancellationToken stoppingToken)
     {
-        var directory = Path.Combine(App.WebHostEnvironment.WebRootPath, "Temp");
-        directory.AsDirectory().GetFiles()
-            .Where(file => DateTime.Now - file.CreationTime > TimeSpan.FromMinutes(10))
-            .ToList()
-            .ForEach(file => file.Delete());
+        var directories = App.GetConfig<string>("AppSettings:DeleteDirectory")
+            .Split(",", StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var directory in directories.Select(dir => dir.AsDirectory()))
+        {
+            var expiredFiles = directory.GetFiles()
+                .Where(file => DateTime.Now - file.CreationTime > TimeSpan.FromMinutes(10));
+
+            foreach (var file in expiredFiles)
+            {
+                file.Delete();
+            }
+        }
 
         return Task.CompletedTask;
     }
