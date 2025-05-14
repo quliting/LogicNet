@@ -1,5 +1,7 @@
 ﻿using System;
 using Furion;
+using Furion.Schedule;
+using LogicNet.Web.Core.Job;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +31,8 @@ public class Startup : AppStartup
         });
 
         services.AddCaptcha(App.Configuration);
+
+        services.AddSchedule(item => { item.AddJob<DeleteDirJob>(TriggerBuilder.Period(1000)); });
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
