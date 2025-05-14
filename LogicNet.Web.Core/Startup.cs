@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Yitter.IdGenerator;
 using ZstdSharp.Unsafe;
 
@@ -54,6 +55,23 @@ public class Startup : AppStartup
         services.AddCaptcha(App.Configuration);
 
         services.AddSchedule(item => { item.AddJob<DeleteDirJob>(TriggerBuilder.Period(1000)); });
+
+        // 例子一：根据日志级别输出
+        services.AddFileLogging("Logs/application-{0:yyyy}-{0:MM}-{0:dd}.log",
+            options =>
+            {
+                options.FileNameRule = item => string.Format(item, DateTime.UtcNow);
+                options.FileSizeLimitBytes = 1024 * 1024 * 30;
+                options.WriteFilter = logMsg => logMsg.LogLevel == LogLevel.Information;
+            });
+
+        services.AddFileLogging("Logs/Error-{0:yyyy}-{0:MM}-{0:dd}.log",
+            options =>
+            {
+                options.FileSizeLimitBytes = 1024 * 1024 * 30;
+                options.FileNameRule = item => string.Format(item, DateTime.UtcNow);
+                options.WriteFilter = logMsg => logMsg.LogLevel == LogLevel.Error;
+            });
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
