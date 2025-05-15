@@ -11,8 +11,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Yitter.IdGenerator;
-using ZstdSharp.Unsafe;
+using Yitter.IdGenerator; 
 
 namespace LogicNet.Web.Core;
 
@@ -21,10 +20,8 @@ public class Startup : AppStartup
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddConsoleFormatter();
-        services.AddJwt<JwtHandler>();
-
+        services.AddJwt<JwtHandler>(enableGlobalAuthorize: true);
         services.AddCorsAccessor();
-
         services.AddControllers().AddJsonOptions(item =>
             {
                 item.JsonSerializerOptions.AllowTrailingCommas = true;
