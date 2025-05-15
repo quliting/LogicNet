@@ -1,8 +1,4 @@
-﻿using Dm.util;
-using StackExchange.Profiling.Internal;
-using Yitter.IdGenerator;
-
-namespace LogicNet.Application;
+﻿namespace LogicNet.Application.UserInfo.Services;
 
 public class UserInfoService : LogicBase
 {
