@@ -1,4 +1,4 @@
-﻿namespace LogicNet.Application;
+﻿namespace LogicNet.Application.UserInfo.DTO;
 
 public class Mapper : IRegister
 {
