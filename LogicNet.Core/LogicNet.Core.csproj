@@ -12,14 +12,14 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Furion.Extras.Authentication.JwtBearer" Version="4.9.7.59" />
-		<PackageReference Include="Furion.Extras.ObjectMapper.Mapster" Version="4.9.7.59" />
-		<PackageReference Include="Furion.Pure" Version="4.9.7.59" />
+		<PackageReference Include="Furion.Extras.Authentication.JwtBearer" Version="4.9.7.66" />
+		<PackageReference Include="Furion.Extras.ObjectMapper.Mapster" Version="4.9.7.66" />
+		<PackageReference Include="Furion.Pure" Version="4.9.7.66" />
 		<PackageReference Include="Lazy.Captcha.Core" Version="2.1.0" />
-		<PackageReference Include="Masuit.Tools.Core" Version="2025.1.9" />
-		<PackageReference Include="NewLife.Core" Version="11.5.2025.501" />
+		<PackageReference Include="Masuit.Tools.Core" Version="2025.2.0" />
+		<PackageReference Include="NewLife.Core" Version="11.5.2025.516-beta0234" />
 		<PackageReference Include="NewLife.Redis" Version="6.2.2025.505-beta1201" />
-		<PackageReference Include="SqlSugarCore" Version="5.1.4.189" />
+		<PackageReference Include="SqlSugarCore" Version="5.1.4.194-preview12" />
 		<PackageReference Include="Yitter.IdGenerator" Version="1.0.14" />
 	</ItemGroup>
 
