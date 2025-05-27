@@ -9,26 +9,15 @@ namespace LogicNet.Core;
 /// </summary>
 public static class DbContext
 {
-    /// <summary>
-    /// SqlSugar 数据库实例
-    /// </summary>
-    // public static readonly SqlSugarScope Instance = new(
-    //     // 读取 appsettings.json 中的 ConnectionConfigs 配置节点
-    //     App.GetConfig<List<ConnectionConfig>>("ConnectionConfigs")
-    //     , db =>
-    //     {
-    //         db.CodeFirst.InitTables();
-    //
-    //         var sqlsugar = new SqlSugarClient(db.CurrentConnectionConfig);
-    //         // 这里配置全局事件，比如拦截执行 SQL
-    //          
-    //     });
+    StaticConfig
 }
 
 public class Repository<T> : SimpleClient<T> where T : class, new()
 {
-    public Repository(ISqlSugarClient context = null) : base(context)
+    public Repository(ISqlSugarClient db)
     {
-        base.Context = App.GetService<ISqlSugarClient>();
+        base.Context = db;
     }
+    
+    
 }

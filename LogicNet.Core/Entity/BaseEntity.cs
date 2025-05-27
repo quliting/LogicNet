@@ -7,7 +7,7 @@ public abstract class BaseEntity
 {
     public bool IsDelete { get; set; } = false;
 
-    [SugarColumn(IsPrimaryKey = true)] public int Id { get; set; }
+    [SugarColumn(IsPrimaryKey = true)] public long Id { get; set; }
 
     public DateTime UpdateTime { get; set; } = DateTime.Now;
     public DateTime CreateTime { get; set; } = DateTime.Now;
