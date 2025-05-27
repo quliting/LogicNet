@@ -15,7 +15,11 @@ public class UserInfoService(ISqlSugarClient db) : LogicBase
         var s = await db.Queryable<Core.Entity.UserInfo>().FirstAsync();
         return s.Name;
     }
-    
+
+    public async Task<bool> AddUserInfoAsync()
+    {
+        return true;
+    }
     /// <summary>
     /// 生成表结构
     /// </summary>
