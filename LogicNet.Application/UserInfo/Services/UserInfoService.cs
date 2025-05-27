@@ -1,12 +1,31 @@
-﻿namespace LogicNet.Application.UserInfo.Services;
+﻿using LogicNet.Core.Entity;
+
+namespace LogicNet.Application.UserInfo.Services;
 
 /// <summary>
-/// 用户的逻辑此实例尽量包含所有的CRUD功能。以及Mapper、验证功能。
+///     用户的逻辑此实例尽量包含所有的CRUD功能。以及Mapper、验证功能。
 /// </summary>
-public class UserInfoService : LogicBase
+public class UserInfoService(ISqlSugarClient db) : LogicBase
 {
-    public async Task<bool> LoginAsync()
+    private readonly ISqlSugarClient db = db;
+
+    [AllowAnonymous]
+    public async Task<string> LoginAsync()
     {
+        var s = await db.Queryable<Core.Entity.UserInfo>().FirstAsync();
+        return s.Name;
+    }
+    
+    /// <summary>
+    /// 生成表结构
+    /// </summary>
+    /// <returns></returns>
+    [AllowAnonymous]
+    public async Task<bool> InitTableAsync()
+    {
+        var types = App.EffectiveTypes
+            .Where(t => t.IsClass && !t.IsAbstract && typeof(BaseEntity).IsAssignableFrom(t)).ToList();
+        db.CodeFirst.InitTables(types.ToArray());
         return true;
     }
 }
