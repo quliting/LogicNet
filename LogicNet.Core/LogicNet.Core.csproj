@@ -12,6 +12,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Bing.Utils" Version="1.5.0" />
 		<PackageReference Include="Furion.Extras.Authentication.JwtBearer" Version="4.9.7.66" />
 		<PackageReference Include="Furion.Extras.ObjectMapper.Mapster" Version="4.9.7.66" />
 		<PackageReference Include="Furion.Pure" Version="4.9.7.66" />
