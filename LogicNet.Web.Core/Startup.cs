@@ -77,13 +77,20 @@ public class Startup : AppStartup
                 options.WriteFilter = logMsg => logMsg.LogLevel == LogLevel.Error;
             });
         //注册SqlSugar
-        services.AddSingleton<ISqlSugarClient>(s =>
+        services.AddScoped<ISqlSugarClient>(s =>
         {
             var sqlSugar = new SqlSugarScope(App.GetConfig<List<ConnectionConfig>>("ConnectionConfigs"),
                 db =>
                 {
                     //单例参数配置，所有上下文生效
-                    db.Aop.OnLogExecuting = (sql, pars) => { };
+                    db.Aop.OnLogExecuting = (sql, pars) =>
+                    {
+                        //Sql 执行前
+                    };
+                    db.Aop.OnError = (exp) =>
+                    {
+                        //Sql 执行出错
+                    };
                 });
             return sqlSugar;
         });
