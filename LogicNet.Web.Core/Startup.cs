@@ -83,17 +83,12 @@ public class Startup : AppStartup
                 db =>
                 {
                     //单例参数配置，所有上下文生效
-                    db.Aop.OnLogExecuting = (sql, pars) =>
-                    {
-                        
-                    };
+                    db.Aop.OnLogExecuting = (sql, pars) => { };
                 });
             return sqlSugar;
         });
 
-        var types = App.EffectiveTypes
-            .Where(t => t.IsClass && !t.IsAbstract && typeof(BaseEntity).IsAssignableFrom(t)).ToList();
-        App.GetService<ISqlSugarClient>().CodeFirst.InitTables(types.ToArray());
+        services.AddScoped(typeof(Repository<>));
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)

@@ -14,10 +14,16 @@
                 用户的逻辑此实例尽量包含所有的CRUD功能。以及Mapper、验证功能。
             </summary>
         </member>
-        <member name="M:LogicNet.Application.UserInfo.Services.UserInfoService.#ctor(SqlSugar.ISqlSugarClient)">
+        <member name="M:LogicNet.Application.UserInfo.Services.UserInfoService.#ctor(SqlSugar.ISqlSugarClient,LogicNet.Core.Repository{LogicNet.Core.Entity.UserInfo})">
             <summary>
                 用户的逻辑此实例尽量包含所有的CRUD功能。以及Mapper、验证功能。
             </summary>
+        </member>
+        <member name="M:LogicNet.Application.UserInfo.Services.UserInfoService.InitTableAsync">
+            <summary>
+            生成表结构
+            </summary>
+            <returns></returns>
         </member>
     </members>
 </doc>
