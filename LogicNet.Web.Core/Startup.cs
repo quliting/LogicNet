@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Bing.Extensions;
 using Furion;
 using Furion.JsonSerialization;
 using Furion.Logging;
@@ -90,6 +92,42 @@ public class Startup : AppStartup
                     db.Aop.OnError = (exp) =>
                     {
                         //Sql 执行出错
+                    };
+                    db.Aop.DataExecuting = (oldValue, entityInfo) =>
+                    {
+                        var userId = App.User.FindFirstValue("Id").ToLong();
+                        switch (entityInfo.PropertyName)
+                        {
+                            case nameof(UserInfo.CreateTime):
+                            {
+                                if (entityInfo.OperationType == DataFilterType.InsertByObject)
+                                {
+                                    entityInfo.SetValue(DateTime.Now);
+                                }
+
+                                break;
+                            }
+                            case nameof(UserInfo.UpdateTime):
+                            {
+                                entityInfo.SetValue(DateTime.Now);
+                                break;
+                            }
+
+                            case nameof(UserInfo.CreateUserId):
+                            {
+                                if (entityInfo.OperationType == DataFilterType.InsertByObject)
+                                {
+                                    entityInfo.SetValue(userId);
+                                }
+
+                                break;
+                            }
+                            case nameof(UserInfo.UpdateUserId):
+                            {
+                                entityInfo.SetValue(userId);
+                                break;
+                            }
+                        }
                     };
                 });
             return sqlSugar;
