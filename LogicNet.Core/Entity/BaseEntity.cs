@@ -11,4 +11,7 @@ public abstract class BaseEntity
 
     public DateTime UpdateTime { get; set; } = DateTime.Now;
     public DateTime CreateTime { get; set; } = DateTime.Now;
+    
+    public long CreateUserId { get; set; }
+    public long UpdateUserId { get; set; }
 }
