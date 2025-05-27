@@ -4,5 +4,20 @@
         <name>LogicNet.Application</name>
     </assembly>
     <members>
+        <member name="P:LogicNet.Application.UserInfo.DTO.LoginInputDto.Code">
+            <summary>
+            图形验证码
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.UserInfo.Services.UserInfoService">
+            <summary>
+                用户的逻辑此实例尽量包含所有的CRUD功能。以及Mapper、验证功能。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.UserInfo.Services.UserInfoService.#ctor(SqlSugar.ISqlSugarClient)">
+            <summary>
+                用户的逻辑此实例尽量包含所有的CRUD功能。以及Mapper、验证功能。
+            </summary>
+        </member>
     </members>
 </doc>
