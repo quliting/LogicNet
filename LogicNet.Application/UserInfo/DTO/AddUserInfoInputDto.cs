@@ -3,6 +3,7 @@
 public class AddUserInfoInputDto
 {
     public string Mobile { get; set; }
-    public string Name { get; set; }
-    public long ? Id { get; set; }
+    public string Name { get; set; } 
+    
+    public string UserName { get; set; }
 }

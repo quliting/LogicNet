@@ -19,10 +19,11 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
         return "ss";
     }
 
+    [AllowAnonymous]
     public async Task<bool> AddUserInfoAsync(AddUserInfoInputDto inputDto)
     {
         var userInfo = inputDto.Adapt<Core.Entity.UserInfo>();
-        await db.Insertable(userInfo).ExecuteCommandAsync();
+        await db.Insertable(userInfo).ExecuteReturnSnowflakeIdAsync();
         return true;
     }
 
