@@ -134,6 +134,9 @@ public class Startup : AppStartup
         });
 
         services.AddScoped(typeof(Repository<>));
+        
+        SnowFlakeSingle.WorkId  = 1;
+        StaticConfig.CustomSnowFlakeFunc = YitIdHelper.NextId; 
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
