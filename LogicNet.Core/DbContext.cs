@@ -9,7 +9,7 @@ namespace LogicNet.Core;
 /// </summary>
 public static class DbContext
 {
-    StaticConfig
+    
 }
 
 public class Repository<T> : SimpleClient<T> where T : class, new()
