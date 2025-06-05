@@ -21,6 +21,7 @@
 		<PackageReference Include="NewLife.Core" Version="11.5.2025.516-beta0234" />
 		<PackageReference Include="NewLife.Redis" Version="6.2.2025.505-beta1201" />
 		<PackageReference Include="SqlSugarCore" Version="5.1.4.194-preview12" />
+		<PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
 		<PackageReference Include="Yitter.IdGenerator" Version="1.0.14" />
 	</ItemGroup>
 
