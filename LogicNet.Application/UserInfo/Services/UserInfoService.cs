@@ -1,6 +1,7 @@
 ﻿using LogicNet.Application.UserInfo.DTO;
 using LogicNet.Core;
 using LogicNet.Core.Entity;
+using Masuit.Tools;
 
 namespace LogicNet.Application.UserInfo.Services;
 
@@ -22,7 +23,11 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
     [AllowAnonymous]
     public async Task<bool> AddUserInfoAsync(AddUserInfoInputDto inputDto)
     {
-        // if(inputDto.Mobile.mas)
+        if (!inputDto.Mobile.MatchPhoneNumber())
+        {
+            throw Oops.Bah("手机号格式错误");
+        }
+
         var exist = await db.Queryable<Core.Entity.UserInfo>().Where(x => x.Mobile == inputDto.Mobile).AnyAsync();
         if (exist)
         {
