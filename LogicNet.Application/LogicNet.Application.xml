@@ -21,7 +21,7 @@
         </member>
         <member name="M:LogicNet.Application.UserInfo.Services.UserInfoService.InitTableAsync">
             <summary>
-            生成表结构
+                生成表结构
             </summary>
             <returns></returns>
         </member>
