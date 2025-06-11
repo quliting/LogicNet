@@ -22,6 +22,13 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
     [AllowAnonymous]
     public async Task<bool> AddUserInfoAsync(AddUserInfoInputDto inputDto)
     {
+        // if(inputDto.Mobile.mas)
+        var exist = await db.Queryable<Core.Entity.UserInfo>().Where(x => x.Mobile == inputDto.Mobile).AnyAsync();
+        if (exist)
+        {
+            throw Oops.Bah("手机号已存在");
+        }
+
         var userInfo = inputDto.Adapt<Core.Entity.UserInfo>();
         await db.Insertable(userInfo).ExecuteReturnSnowflakeIdAsync();
         return true;
