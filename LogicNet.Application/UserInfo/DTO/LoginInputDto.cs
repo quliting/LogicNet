@@ -3,7 +3,7 @@
 public class LoginInputDto
 {
     [Required(ErrorMessage = "登录类型不能为空"), Range(1, 2, ErrorMessage = "登录类型错误")]
-    public LogicConst.LoginType LoginType { get; set; }
+    public LogicConst.LoginType LoginType { get; set; } = LogicConst.LoginType.手机号码登录;
 
     public string Mobile { get; set; }
 
