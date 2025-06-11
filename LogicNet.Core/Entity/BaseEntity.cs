@@ -5,7 +5,6 @@ namespace LogicNet.Core.Entity;
 
 public abstract class BaseEntity
 {
-    [SugarColumn(IsOnlyIgnoreInsert = true)]
     public bool IsDelete { get; set; } = false;
 
     [SugarColumn(IsPrimaryKey = true)] public long Id { get; set; }

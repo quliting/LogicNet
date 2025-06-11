@@ -13,15 +13,21 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
     private readonly ISqlSugarClient db = db;
 
     [AllowAnonymous]
-    public async Task<string> LoginAsync()
+    public async Task<string> LoginAsync(LoginInputDto inputDto)
     {
-        var ss = userRepository.AsQueryable().Count();
-        var s = await db.Queryable<Core.Entity.UserInfo>().FirstAsync();
-        return "ss";
+        switch (inputDto.LoginType)
+        {
+            case LogicConst.LoginType.手机号码登录:
+                break;
+            case LogicConst.LoginType.用户名密码登录:
+                break;
+        }
+
+        return string.Empty;
     }
 
     [AllowAnonymous]
-    public async Task<bool> AddUserInfoAsync(AddUserInfoInputDto inputDto)
+    public async Task<bool> RegisterAsync(AddUserInfoInputDto inputDto)
     {
         if (!inputDto.Mobile.MatchPhoneNumber())
         {
@@ -32,6 +38,12 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
         if (exist)
         {
             throw Oops.Bah("手机号已存在");
+        }
+
+        exist = await db.Queryable<Core.Entity.UserInfo>().Where(x => x.UserName == inputDto.UserName).AnyAsync();
+        if (exist)
+        {
+            throw Oops.Bah("用户名已存在");
         }
 
         var userInfo = inputDto.Adapt<Core.Entity.UserInfo>();
