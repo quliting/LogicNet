@@ -17,54 +17,38 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
     [AllowAnonymous]
     public async Task<string> LoginAsync(LoginInputDto inputDto)
     {
-        string returnTips = "用户名密码错误";
+        var returnTips = "用户名密码错误";
         Core.Entity.UserInfo userInfo = null;
         switch (inputDto.LoginType)
         {
             case LogicConst.LoginType.手机号码登录:
-                if (inputDto.Mobile.IsNullOrEmpty() || !inputDto.Mobile.MatchPhoneNumber())
-                {
-                    throw Oops.Bah(returnTips);
-                }
-
-                if (inputDto.PassWord.IsNullOrEmpty())
-                {
-                    throw Oops.Bah(returnTips);
-                }
+                if (inputDto.Mobile.IsNullOrEmpty() || !inputDto.Mobile.MatchPhoneNumber() ||
+                    inputDto.PassWord.IsNullOrEmpty()) throw Oops.Bah(returnTips);
 
                 userInfo = await db.Queryable<Core.Entity.UserInfo>().Where(item => item.Mobile == inputDto.Mobile)
                     .FirstAsync();
-                if (userInfo is null)
-                {
-                    throw Oops.Bah(returnTips);
-                }
+                if (userInfo is null) throw Oops.Bah(returnTips);
 
                 break;
             case LogicConst.LoginType.用户名密码登录:
-                if (inputDto.UserName.IsNullOrEmpty())
-                {
-                    throw Oops.Bah(returnTips);
-                }
-
-                if (inputDto.PassWord.IsNullOrEmpty())
-                {
-                    throw Oops.Bah(returnTips);
-                }
+                if (inputDto.UserName.IsNullOrEmpty() || inputDto.PassWord.IsNullOrEmpty()) throw Oops.Bah(returnTips);
 
                 userInfo = await db.Queryable<Core.Entity.UserInfo>().Where(item =>
                         item.UserName == inputDto.UserName &&
                         item.Password == inputDto.PassWord.ToMD5Encrypt(false, false))
                     .FirstAsync();
 
-                if (userInfo is null)
-                {
-                    throw Oops.Bah(returnTips);
-                }
+                if (userInfo is null) throw Oops.Bah(returnTips);
 
                 break;
         }
 
-        return string.Empty;
+        var accessToken = JWTEncryption.Encrypt(new Dictionary<string, object>
+        {
+            { "UserId", userInfo.Id },
+            { "Account", userInfo.UserName }
+        });
+        return accessToken;
     }
 
 
@@ -72,10 +56,7 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
     public async Task<bool> RegisterAsync(AddUserInfoInputDto inputDto)
     {
         if (!inputDto.Mobile.MatchPhoneNumber()) throw Oops.Bah("手机号格式错误");
-        if (inputDto.UserName.IsNullOrEmpty())
-        {
-            throw Oops.Bah("用户名不能为空");
-        }
+        if (inputDto.UserName.IsNullOrEmpty()) throw Oops.Bah("用户名不能为空");
 
         CheckUserName(inputDto.UserName);
         var exist = await db.Queryable<Core.Entity.UserInfo>().Where(x => x.Mobile == inputDto.Mobile).AnyAsync();
@@ -89,19 +70,13 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
         return true;
     }
 
-    private bool CheckUserName(string UserName)
+    private void CheckUserName(string UserName)
     {
         var returnTips = "用户名应以字母开头,8-15位";
         var letter = UserName[0];
-        if (!letter.IsLetter())
-        {
-            throw Oops.Bah(returnTips);
-        }
+        if (!letter.IsLetter()) throw Oops.Bah(returnTips);
 
-        if (UserName.Length < 8 || UserName.Length > 15)
-        {
-            throw Oops.Bah(returnTips);
-        }
+        if (UserName.Length < 8 || UserName.Length > 15) throw Oops.Bah(returnTips);
     }
 
     /// <summary>
