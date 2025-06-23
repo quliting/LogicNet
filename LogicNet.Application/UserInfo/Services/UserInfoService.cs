@@ -4,6 +4,7 @@ using LogicNet.Application.UserInfo.DTO;
 using LogicNet.Core;
 using LogicNet.Core.Entity;
 using Masuit.Tools;
+using Masuit.Tools.Models;
 
 namespace LogicNet.Application.UserInfo.Services;
 
@@ -67,6 +68,20 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
         var userInfo = inputDto.Adapt<Core.Entity.UserInfo>();
         await db.Insertable(userInfo).ExecuteReturnSnowflakeIdAsync();
         return true;
+    }
+
+    [AllowAnonymous]
+    public async Task<PagedList<GetUserListOutputDto>> GetUserListAsync(GetUserListInputDto inputDto)
+    {
+        var query = db.Queryable<Core.Entity.UserInfo>()
+            .WhereIF(inputDto.Mobile.NotNullOrEmpty(), x => x.Mobile == inputDto.Mobile)
+            .WhereIF(inputDto.Name.NotNullOrEmpty(), x => x.Name == inputDto.Name);
+
+        RefAsync<int> total = 0;
+        var result = (await query.Select<GetUserListOutputDto>()
+                .ToPageListAsync(inputDto.PageIndex, inputDto.PageSize, total))
+            .PagedList(inputDto.PageIndex, inputDto.PageSize, total.Value);
+        return result;
     }
 
     private void CheckUserName(string UserName)
