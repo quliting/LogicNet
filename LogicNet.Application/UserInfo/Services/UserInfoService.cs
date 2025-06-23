@@ -73,10 +73,10 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
     private void CheckUserName(string UserName)
     {
         var returnTips = "用户名应以字母开头,8-15位";
+        if (UserName.Length < 8 || UserName.Length > 15) throw Oops.Bah(returnTips);
+
         var letter = UserName[0];
         if (!letter.IsLetter()) throw Oops.Bah(returnTips);
-
-        if (UserName.Length < 8 || UserName.Length > 15) throw Oops.Bah(returnTips);
     }
 
     /// <summary>
