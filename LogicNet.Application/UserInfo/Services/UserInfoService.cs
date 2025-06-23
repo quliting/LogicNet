@@ -28,7 +28,6 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
                 userInfo = await db.Queryable<Core.Entity.UserInfo>().Where(item => item.Mobile == inputDto.Mobile)
                     .FirstAsync();
                 if (userInfo is null) throw Oops.Bah(returnTips);
-
                 break;
             case LogicConst.LoginType.用户名密码登录:
                 if (inputDto.UserName.IsNullOrEmpty() || inputDto.PassWord.IsNullOrEmpty()) throw Oops.Bah(returnTips);
@@ -75,8 +74,7 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
         var returnTips = "用户名应以字母开头,8-15位";
         if (UserName.Length < 8 || UserName.Length > 15) throw Oops.Bah(returnTips);
 
-        var letter = UserName[0];
-        if (!letter.IsLetter()) throw Oops.Bah(returnTips);
+        if (!UserName[0].IsLetter()) throw Oops.Bah(returnTips);
     }
 
     /// <summary>
