@@ -95,11 +95,11 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
     /// </summary>
     /// <returns></returns>
     [AllowAnonymous]
-    public async Task<bool> InitTableAsync()
+    public Task<bool> InitTableAsync()
     {
         var types = App.EffectiveTypes
             .Where(t => t.IsClass && !t.IsAbstract && typeof(BaseEntity).IsAssignableFrom(t)).ToList();
         db.CodeFirst.InitTables(types.ToArray());
-        return true;
+        return Task.FromResult(true);
     }
 }
