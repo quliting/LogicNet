@@ -77,7 +77,6 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
             .WhereIF(inputDto.Mobile.NotNullOrEmpty(), x => x.Mobile == inputDto.Mobile)
             .WhereIF(inputDto.Name.NotNullOrEmpty(), x => x.Name == inputDto.Name);
 
-        // await query.Select<GetUserListOutputDto>().to
         RefAsync<int> total = 0;
         var result = (await query.Select<GetUserListOutputDto>()
                 .ToPageListAsync(inputDto.PageIndex, inputDto.PageSize, total))
