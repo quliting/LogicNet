@@ -14,7 +14,7 @@
                 用户的逻辑此实例尽量包含所有的CRUD功能。以及Mapper、验证功能。
             </summary>
         </member>
-        <member name="M:LogicNet.Application.UserInfo.Services.UserInfoService.#ctor(SqlSugar.ISqlSugarClient,LogicNet.Core.Repository{LogicNet.Core.Entity.UserInfo})">
+        <member name="M:LogicNet.Application.UserInfo.Services.UserInfoService.#ctor(SqlSugar.ISqlSugarClient,LogicNet.Core.Repository{LogicNet.Core.Entity.UserInfo},Microsoft.AspNetCore.SignalR.IHubClients{LogicNet.Application.Hub.UserHub})">
             <summary>
                 用户的逻辑此实例尽量包含所有的CRUD功能。以及Mapper、验证功能。
             </summary>
