@@ -134,9 +134,11 @@ public class Startup : AppStartup
         });
 
         services.AddScoped(typeof(Repository<>));
-        
-        SnowFlakeSingle.WorkId  = 1;
-        StaticConfig.CustomSnowFlakeFunc = YitIdHelper.NextId; 
+
+        SnowFlakeSingle.WorkId = 1;
+        StaticConfig.CustomSnowFlakeFunc = YitIdHelper.NextId;
+
+        services.AddSignalR();
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -158,6 +160,10 @@ public class Startup : AppStartup
 
         app.UseInject(string.Empty);
 
-        app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapHubs();
+            endpoints.MapControllers();
+        });
     }
 }

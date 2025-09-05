@@ -1,19 +1,25 @@
 ﻿using Bing;
 using Furion.DataEncryption.Extensions;
+using LogicNet.Application.Hub;
 using LogicNet.Application.UserInfo.DTO;
 using LogicNet.Core;
 using LogicNet.Core.Entity;
 using Masuit.Tools;
 using Masuit.Tools.Models;
+using Microsoft.AspNetCore.SignalR;
 
 namespace LogicNet.Application.UserInfo.Services;
 
 /// <summary>
 ///     用户的逻辑此实例尽量包含所有的CRUD功能。以及Mapper、验证功能。
 /// </summary>
-public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo> userRepository) : LogicBase
+public class UserInfoService(
+    ISqlSugarClient db,
+    Repository<Core.Entity.UserInfo> userRepository,
+    IHubClients<UserHub> hubClients) : LogicBase
 {
     private readonly ISqlSugarClient db = db;
+    private readonly IHubClients<UserHub> _hubClients = hubClients;
 
     [AllowAnonymous]
     public async Task<string> LoginAsync(LoginInputDto inputDto)
@@ -48,6 +54,8 @@ public class UserInfoService(ISqlSugarClient db, Repository<Core.Entity.UserInfo
             { "UserId", userInfo.Id },
             { "Account", userInfo.UserName }
         });
+
+        // _hubClients..LoginAsync(inputDto);
         return accessToken;
     }
 
