@@ -24,7 +24,14 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<Folder Include="Dll\" />
 		<Folder Include="UserInfo\Services\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Reference Include="Aspose.Words">
+	    <HintPath>Dll\Aspose.Words.dll</HintPath>
+	  </Reference>
 	</ItemGroup>
 
 </Project>
