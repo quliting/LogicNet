@@ -15,11 +15,10 @@ namespace LogicNet.Application.UserInfo.Services;
 /// </summary>
 public class UserInfoService(
     ISqlSugarClient db,
-    Repository<Core.Entity.UserInfo> userRepository,
-    IHubClients<UserHub> hubClients) : LogicBase
+    Repository<Core.Entity.UserInfo> userRepository) : LogicBase
 {
     private readonly ISqlSugarClient db = db;
-    private readonly IHubClients<UserHub> _hubClients = hubClients;
+    private readonly IHubClients<UserHub> _hubClients;
 
     [AllowAnonymous]
     public async Task<string> LoginAsync(LoginInputDto inputDto)
@@ -96,18 +95,14 @@ public class UserInfoService(
         if (UserName.Length < 8 || UserName.Length > 15) throw Oops.Bah(returnTips);
 
         if (!UserName[0].IsLetter()) throw Oops.Bah(returnTips);
-    }
-
-    /// <summary>
-    ///     生成表结构
-    /// </summary>
-    /// <returns></returns>
-    [AllowAnonymous]
-    public Task<bool> InitTableAsync()
-    {
-        var types = App.EffectiveTypes
-            .Where(t => t.IsClass && !t.IsAbstract && typeof(BaseEntity).IsAssignableFrom(t)).ToList();
-        db.CodeFirst.InitTables(types.ToArray());
-        return Task.FromResult(true);
-    }
-}
+    } }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
