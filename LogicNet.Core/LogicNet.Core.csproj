@@ -13,16 +13,20 @@
 
 	<ItemGroup>
 		<PackageReference Include="Bing.Utils" Version="1.5.0" />
-		<PackageReference Include="Furion.Extras.Authentication.JwtBearer" Version="4.9.7.229" />
-		<PackageReference Include="Furion.Extras.ObjectMapper.Mapster" Version="4.9.7.229" />
-		<PackageReference Include="Furion.Pure" Version="4.9.7.229" />
+		<PackageReference Include="Furion.Extras.Authentication.JwtBearer" Version="4.9.8.24" />
+		<PackageReference Include="Furion.Extras.ObjectMapper.Mapster" Version="4.9.8.24" />
+		<PackageReference Include="Furion.Pure" Version="4.9.8.24" />
 		<PackageReference Include="Lazy.Captcha.Core" Version="2.2.3-alpha" />
-		<PackageReference Include="Masuit.Tools.Core" Version="2025.6.4" />
-		<PackageReference Include="NewLife.Core" Version="11.9.2025.1217-beta0316" />
-		<PackageReference Include="NewLife.Redis" Version="6.4.2025.1216-beta1109" />
-		<PackageReference Include="SqlSugarCore" Version="5.1.4.211-preview13" />
+		<PackageReference Include="Masuit.Tools.Core" Version="2026.1.2" />
+		<PackageReference Include="NewLife.Core" Version="11.13.2026.319-beta0606" />
+		<PackageReference Include="NewLife.Redis" Version="6.5.2026.307-beta1435" />
+		<PackageReference Include="SqlSugarCore" Version="5.1.4.215-preview05" />
 		<PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
 		<PackageReference Include="Yitter.IdGenerator" Version="1.0.14" />
+		<PackageReference Update="Microsoft.SourceLink.GitHub" Version="11.0.100-preview.2.26159.112">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
 	</ItemGroup>
 
 </Project>
