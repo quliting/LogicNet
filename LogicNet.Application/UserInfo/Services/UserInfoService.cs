@@ -82,7 +82,7 @@ public class UserInfoService(
     {
         var query = db.Queryable<Core.Entity.UserInfo>()
             .WhereIF(inputDto.Mobile.NotNullOrEmpty(), x => x.Mobile == inputDto.Mobile)
-            .WhereIF(inputDto.Name.NotNullOrEmpty(), x => x.Name == inputDto.Name);
+            .WhereIF(inputDto.Name.NotNullOrEmpty(), x => x.Name.Contains(inputDto.Name)).OrderByDescending(item=>item.CreateTime);
 
         var result = await query.Select<GetUserListOutputDto>()
             .PagedList(inputDto.PageIndex, inputDto.PageSize);
