@@ -23,3 +23,8 @@
 **/values.dev.yaml
 LICENSE
 README.md
+# Aspose.Words.dll 为本地未跟踪二进制，构建上下文一律排除，
+# 使容器构建与干净检出一致走 LogicNet.Application.csproj 的“无 Dll 排除 TestService”路径
+LogicNet.Application/Dll/
+# 本地角色/提示词定义，与运行时无关
+.opencode/
