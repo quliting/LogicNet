@@ -22,7 +22,14 @@ cp .env.example .env
 | `DB_CONNECTION_STRING` | MySQL 连接串 | 见 `.env.example` 注释（外部实例 / 内置 mysql 两种写法） |
 | `DB_ROOT_PASSWORD` | 仅内置 MySQL 模式使用 | `openssl rand -base64 32` |
 
-数据库方案切换：默认复用外部 MySQL；改用 compose 内置 MySQL 时，按 `docker-compose.yml` 文件头注释启用 `mysql` 服务并调整连接串（注意宿主 3306 端口冲突，数据持久化在 `logicnet-mysql` 卷）。
+数据库方案切换：默认复用外部 MySQL；改用 compose 内置 MySQL 时，启动命令追加覆盖文件，并把 `.env` 的 `DB_CONNECTION_STRING` 指向 `Data Source=mysql`（详见 `docker-compose.yml` 文件头注释）：
+
+```bash
+# 方案 B 的所有 compose 命令都带两个 -f；也可先 export COMPOSE_FILE=docker-compose.yml:docker-compose.mysql.yml 省略
+docker compose -f docker-compose.yml -f docker-compose.mysql.yml up -d
+```
+
+注意宿主不要再占用 3306，数据持久化在 `logicnet-mysql` 卷。
 
 ## 2. 构建与启动
 
@@ -51,7 +58,7 @@ curl -fsS http://localhost:8080/health
 mysql -h <主机> -u <账号> -p LogicNet < Sql/2026-11-02_P0_UserInfo唯一索引.sql
 ```
 
-内置 MySQL 模式下：`docker compose exec mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" logicnet' < "Sql/2026-11-02_P0_UserInfo唯一索引.sql"`
+内置 MySQL 模式下：`docker compose -f docker-compose.yml -f docker-compose.mysql.yml exec mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" logicnet' < "Sql/2026-11-02_P0_UserInfo唯一索引.sql"`
 
 ## 4. 升级
 
