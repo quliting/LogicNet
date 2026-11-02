@@ -13,7 +13,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LogicNet.Web.Entry", "Logic
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{F914049F-2C37-4B58-83F2-D36D9089AC13}"
 	ProjectSection(SolutionItems) = preProject
-		compose.yaml = compose.yaml
+		docker-compose.yml = docker-compose.yml
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogicNet.Tests", "LogicNet.Tests\LogicNet.Tests.csproj", "{5CF781D9-9ADB-4582-861B-EEBD522A10F8}"

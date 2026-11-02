@@ -1,0 +1,71 @@
+name: logicnet
+
+# LogicNet 应用编排。配置通过同目录 .env 注入（参照 .env.example 生成）。
+# 数据库两种模式（默认 A）：
+#   A. 复用外部 MySQL（默认）：.env 的 DB_CONNECTION_STRING 指向已有实例，无需改动本文件。
+#   B. compose 内置 MySQL：取消本文件下方 mysql 服务、volumes 中 logicnet-mysql、
+#      以及 app 服务 depends_on 的注释，并把 .env 的 DB_CONNECTION_STRING 改为：
+#      Data Source=mysql;Database=logicnet;User ID=root;Password=<与 DB_ROOT_PASSWORD 相同>;port=3306;CharSet=utf8mb4;SslMode=none
+#      注意：内置模式不要在宿主再占用 3306；数据持久化在 logicnet-mysql 卷。
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: LogicNet.Web.Entry/Dockerfile
+    image: logicnet:latest
+    container_name: logicnet-app
+    restart: unless-stopped
+    ports:
+      # 左侧为宿主端口，可在 .env 用 APP_PORT 覆盖
+      - "${APP_PORT:-8080}:8080"
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # 覆盖 appsettings.json 占位（双下划线对应配置层级），密钥只存在于 NAS 本地 .env
+      ConnectionConfigs__0__ConnectionString: "${DB_CONNECTION_STRING}"
+      JWTSettings__IssuerSigningKey: "${JWT_ISSUER_SIGNING_KEY}"
+    volumes:
+      # 命名卷持久化应用日志（/app/Logs，属主为容器内 app 用户 uid 1654）。
+      # 若想直接在 NAS 文件管理器查看，可改为绑定挂载，例如：
+      #   - ./volumes/logs:/app/Logs
+      # 绑定挂载需先执行：mkdir -p ./volumes/logs && sudo chown -R 1654:1654 ./volumes/logs
+      - logicnet-logs:/app/Logs
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    # 内置 MySQL 模式（方案 B）时取消注释：
+    # depends_on:
+    #   mysql:
+    #     condition: service_healthy
+
+  # ===== 方案 B：compose 内置 MySQL（默认注释，启用时整段取消注释） =====
+  # mysql:
+  #   image: mysql:8.0
+  #   container_name: logicnet-mysql
+  #   restart: unless-stopped
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD}"
+  #     MYSQL_DATABASE: logicnet
+  #     TZ: Asia/Shanghai
+  #   command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_general_ci"]
+  #   volumes:
+  #     - logicnet-mysql:/var/lib/mysql
+  #   # 默认不对宿主暴露端口；如需从外部管理工具连接，放开下一行（仅回环地址）：
+  #   # ports:
+  #   #   - "127.0.0.1:3306:3306"
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_ROOT_PASSWORD}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 10
+  #     start_period: 30s
+
+volumes:
+  logicnet-logs:
+  # 内置 MySQL 模式（方案 B）时取消注释：
+  # logicnet-mysql:
