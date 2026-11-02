@@ -5,13 +5,13 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Bing.Extensions;
 using Furion;
 using Furion.JsonSerialization;
 using Furion.Logging;
 using Furion.Schedule;
 using LogicNet.Core;
 using LogicNet.Core.Entity;
+using LogicNet.Core.Security;
 using LogicNet.Web.Core.Job;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -110,7 +110,11 @@ public class Startup : AppStartup
                     };
                     db.Aop.DataExecuting = (oldValue, entityInfo) =>
                     {
-                        var userId = App.User.FindFirstValue("Id").ToLong();
+                        // 声明名与登录颁发令牌的 JwtClaimNames.UserId 保持一致（此前读 "Id" 恒为 0）；
+                        // 无 HttpContext 场景（如定时任务）App.User 为空，安全回退为 0
+                        var userId = long.TryParse(App.User?.FindFirstValue(JwtClaimNames.UserId), out var parsedUserId)
+                            ? parsedUserId
+                            : 0;
                         switch (entityInfo.PropertyName)
                         {
                             case nameof(UserInfo.CreateTime):
