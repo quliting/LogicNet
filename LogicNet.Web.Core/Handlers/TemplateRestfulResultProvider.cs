@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Furion;
 using Furion.DataValidation;
@@ -9,7 +10,6 @@ using Furion.UnifyResult;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.Extensions.Hosting;
 
 namespace LogicNet.Web.Core;
 
@@ -48,7 +48,15 @@ public class TemplateRestfulResultProvider : IUnifyResultProvider
 {
     public IActionResult OnAuthorizeException(DefaultHttpContext context, ExceptionMetadata metadata)
     {
-        throw new NotImplementedException();
+        // 认证/授权失败按规范返回 401/403（此前抛 NotImplementedException 会被统一包装成 500）
+        var statusCode = metadata.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden
+            ? metadata.StatusCode
+            : StatusCodes.Status401Unauthorized;
+        return new JsonResult(LogicRESTfulResult(statusCode, data: metadata.Data, errors: metadata.Errors),
+            UnifyContext.GetSerializerSettings(context))
+        {
+            StatusCode = statusCode
+        };
     }
 
     /// <summary>
@@ -104,22 +112,19 @@ public class TemplateRestfulResultProvider : IUnifyResultProvider
 
     public IActionResult OnValidateFailed(ActionExecutingContext context, ValidationMetadata metadata)
     {
-        var errorStr = string.Empty;
-        if (metadata.ValidationResult is string)
+        // 聚合返回全部校验错误：字典原样返回（每个字段的所有错误），字符串原样返回，不再强转抛异常，
+        // 也不再用"非法操作"掩码真实错误信息
+        object errors = metadata.ValidationResult switch
         {
-            errorStr = (string)metadata.ValidationResult;
-        }
-        else
-        {
-            var errorsDic = (Dictionary<string, string[]>)metadata.ValidationResult;
-
-            foreach (var item in errorsDic) errorStr = item.Value[0];
-            Log.Error($"非法操作{errorStr}");
-            if (!App.HostEnvironment.IsDevelopment()) errorStr = "非法操作";
-        }
+            string errorMessage => errorMessage,
+            Dictionary<string, string[]> errorDictionary => errorDictionary,
+            { } other => other.ToString(),
+            _ => "请求参数校验失败"
+        };
+        Log.Error($"参数校验失败：{JsonSerializer.Serialize(errors)}");
 
         return new JsonResult(LogicRESTfulResult(metadata.StatusCode ?? StatusCodes.Status400BadRequest,
-                data: metadata.Data, errors: errorStr)
+                data: metadata.Data, errors: errors)
             , UnifyContext.GetSerializerSettings(context));
     }
 
