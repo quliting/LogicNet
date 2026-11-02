@@ -98,6 +98,8 @@ public class Startup : AppStartup
                 db =>
                 {
                     //单例参数配置，所有上下文生效
+                    // 软删除全局过滤器：所有继承 BaseEntity（实现 IDeleteFilter）的实体查询自动排除已删除数据
+                    db.QueryFilter.AddTableFilter<IDeleteFilter>(x => !x.IsDelete);
                     db.Aop.OnLogExecuting = (sql, pars) =>
                     {
                         //Sql 执行前

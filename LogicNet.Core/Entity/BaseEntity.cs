@@ -3,7 +3,7 @@ using SqlSugar;
 
 namespace LogicNet.Core.Entity;
 
-public abstract class BaseEntity
+public abstract class BaseEntity : IDeleteFilter
 {
     public bool IsDelete { get; set; } = false;
 
