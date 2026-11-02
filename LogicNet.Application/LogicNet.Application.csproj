@@ -28,10 +28,18 @@
 		<Folder Include="UserInfo\Services\" />
 	</ItemGroup>
 
-	<ItemGroup>
+	<!--
+	    Aspose.Words.dll 为本地未跟踪文件（许可证/体积原因不入库）。
+	    dll 存在（本地开发）→ 正常引用并编译 TestService；dll 缺失（CI/干净检出）→ 跳过引用并排除 TestService.cs，
+	    保证流水线可构建。TestService 仅演示 Word 替换，不影响业务接口。
+	-->
+	<ItemGroup Condition="Exists('Dll\Aspose.Words.dll')">
 	  <Reference Include="Aspose.Words">
 	    <HintPath>Dll\Aspose.Words.dll</HintPath>
 	  </Reference>
+	</ItemGroup>
+	<ItemGroup Condition="!Exists('Dll\Aspose.Words.dll')">
+	  <Compile Remove="Test\Service\TestService.cs" />
 	</ItemGroup>
 
 	<ItemGroup>

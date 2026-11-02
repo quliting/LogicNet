@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # 只构建 Web.Core 与测试工程，刻意排除 LogicNet.Web.Entry 与全解决方案：
+      # 1) Web.Entry 含 COMReference，仅 Windows MSBuild 可解析（Linux/macOS 报 MSB4803）
+      # 2) Aspose.Words.dll 为本地未跟踪文件不入库；LogicNet.Application.csproj 已条件化——
+      #    dll 缺失时自动排除其唯一使用者 TestService.cs，干净检出即可编译
+      - name: Restore
+        run: |
+          dotnet restore LogicNet.Web.Core/LogicNet.Web.Core.csproj
+          dotnet restore LogicNet.Tests/LogicNet.Tests.csproj
+
+      - name: Build
+        run: |
+          dotnet build LogicNet.Web.Core/LogicNet.Web.Core.csproj --no-restore -c Release --nologo
+          dotnet build LogicNet.Tests/LogicNet.Tests.csproj --no-restore -c Release --nologo
+
+      - name: Test
+        run: dotnet test LogicNet.Tests/LogicNet.Tests.csproj --no-build -c Release --nologo

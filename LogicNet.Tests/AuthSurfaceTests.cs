@@ -30,7 +30,10 @@ public class AuthSurfaceTests
         // 以下不得匿名
         Assert.Null(service.GetMethod("GetUserListAsync")!.GetCustomAttribute<AllowAnonymousAttribute>());
         Assert.Null(service.GetMethod("LogoutAsync")!.GetCustomAttribute<AllowAnonymousAttribute>());
-        Assert.Null(typeof(LogicNet.Application.Test.Service.TestService).GetCustomAttribute<AllowAnonymousAttribute>());
+        // TestService 在 Aspose.Words.dll 缺失的 CI 环境会被条件编译排除，故按名反射，存在才断言
+        var testServiceType = service.Assembly.GetType("LogicNet.Application.Test.Service.TestService");
+        if (testServiceType != null)
+            Assert.Null(testServiceType.GetCustomAttribute<AllowAnonymousAttribute>());
     }
 
     private static (JwtHandler handler, AuthorizationHandlerContext context, DefaultHttpContext http) BuildPipeline(
