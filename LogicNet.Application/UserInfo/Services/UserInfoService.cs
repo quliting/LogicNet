@@ -1,5 +1,4 @@
 ﻿using Bing;
-using Furion.DataEncryption.Extensions;
 using LogicNet.Application.Hub;
 using LogicNet.Application.UserInfo.DTO;
 using LogicNet.Core;
@@ -36,24 +35,24 @@ public class UserInfoService(
                 if (inputDto.Mobile.IsNullOrEmpty() || !inputDto.Mobile.MatchPhoneNumber() ||
                     inputDto.PassWord.IsNullOrEmpty()) throw Oops.Bah(returnTips);
 
-                userInfo = await db.Queryable<Core.Entity.UserInfo>().Where(item =>
-                        item.Mobile == inputDto.Mobile &&
-                        item.Password == inputDto.PassWord.ToMD5Encrypt(false, false))
+                userInfo = await db.Queryable<Core.Entity.UserInfo>().Where(item => item.Mobile == inputDto.Mobile)
                     .FirstAsync();
-                if (userInfo is null) throw Oops.Bah(returnTips);
                 break;
             case LogicConst.LoginType.用户名密码登录:
                 if (inputDto.UserName.IsNullOrEmpty() || inputDto.PassWord.IsNullOrEmpty()) throw Oops.Bah(returnTips);
 
-                userInfo = await db.Queryable<Core.Entity.UserInfo>().Where(item =>
-                        item.UserName == inputDto.UserName &&
-                        item.Password == inputDto.PassWord.ToMD5Encrypt(false, false))
+                userInfo = await db.Queryable<Core.Entity.UserInfo>().Where(item => item.UserName == inputDto.UserName)
                     .FirstAsync();
-
-                if (userInfo is null) throw Oops.Bah(returnTips);
-
                 break;
         }
+
+        // 加盐哈希校验密码（兼容历史无盐 MD5，校验通过后透明升级为加盐哈希）
+        if (userInfo is null || !PasswordHasher.Verify(inputDto.PassWord, userInfo.Password)) throw Oops.Bah(returnTips);
+        if (PasswordHasher.NeedsUpgrade(userInfo.Password))
+            await db.Updateable<Core.Entity.UserInfo>()
+                .SetColumns(item => item.Password == PasswordHasher.Hash(inputDto.PassWord))
+                .Where(item => item.Id == userInfo.Id)
+                .ExecuteCommandAsync();
 
         // 查询用户角色写入令牌声明，供 [Authorize(Roles = ...)] 做权限控制
         var roleNames = await db.Queryable<UserRole, Role>((ur, r) => ur.RoleId == r.Id)
@@ -133,6 +132,7 @@ public class UserInfoService(
         if (inputDto.UserName.IsNullOrEmpty()) throw Oops.Bah("用户名不能为空");
 
         CheckUserName(inputDto.UserName);
+        CheckPassWord(inputDto.PassWord);
         var exist = await db.Queryable<Core.Entity.UserInfo>().Where(x => x.Mobile == inputDto.Mobile).AnyAsync();
         if (exist) throw Oops.Bah("手机号已存在");
 
@@ -140,7 +140,16 @@ public class UserInfoService(
         if (exist) throw Oops.Bah("用户名已存在");
 
         var userInfo = inputDto.Adapt<Core.Entity.UserInfo>();
-        await db.Insertable(userInfo).ExecuteReturnSnowflakeIdAsync();
+        try
+        {
+            await db.Insertable(userInfo).ExecuteReturnSnowflakeIdAsync();
+        }
+        catch (Exception ex) when (IsUniqueKeyConflict(ex))
+        {
+            // 唯一索引兜底并发注册竞态（UX_UserInfo_UserName / UX_UserInfo_Mobile）
+            throw Oops.Bah("用户名或手机号已存在");
+        }
+
         return true;
     }
 
@@ -162,7 +171,22 @@ public class UserInfoService(
         if (UserName.Length < 8 || UserName.Length > 15) throw Oops.Bah(returnTips);
 
         if (!UserName[0].IsLetter()) throw Oops.Bah(returnTips);
-    } }
+    }
+
+    private static void CheckPassWord(string passWord)
+    {
+        if (passWord.IsNullOrEmpty() || passWord.Length < 8 ||
+            !passWord.Any(char.IsLetter) || !passWord.Any(char.IsDigit))
+            throw Oops.Bah("密码至少 8 位，且需同时包含字母和数字");
+    }
+
+    private static bool IsUniqueKeyConflict(Exception ex)
+    {
+        // MySQL 唯一索引冲突错误码 1062（兼容 SqlSugar 包装一层的情况）
+        if (ex is MySqlConnector.MySqlException { Number: 1062 }) return true;
+        return ex.InnerException is MySqlConnector.MySqlException { Number: 1062 };
+    }
+}
     
     
     
