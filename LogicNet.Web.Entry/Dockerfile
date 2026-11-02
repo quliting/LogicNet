@@ -29,14 +29,11 @@ WORKDIR /app
 # JWTSettings__IssuerSigningKey，见 .env.example），镜像内不包含任何机密。
 ENV ASPNETCORE_HTTP_PORTS=8080
 
-# aspnet 基础镜像不含 curl，健康检查（compose healthcheck 调 /health）需要；
-# 同时预建日志目录并授权给运行用户，保证非 root 下可写 Logs/。
+# aspnet 基础镜像不含 curl 且本项目中在飞牛 NAS 的 BuildKit 构建沙箱内 apt-get 会段错误（exit 139），
+# 因此不安装额外工具：健康检查由 compose 用镜像自带 bash 的 /dev/tcp 实现（见 docker-compose.yml）。
+# 预建日志目录并授权给运行用户，保证非 root 下可写 Logs/。
 USER root
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /app/Logs \
-    && chown -R $APP_UID:$APP_UID /app
+RUN mkdir -p /app/Logs && chown -R $APP_UID:$APP_UID /app
 USER $APP_UID
 
 COPY --from=build /app/publish .

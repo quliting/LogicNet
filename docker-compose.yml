@@ -34,7 +34,8 @@ services:
       # 绑定挂载需先执行：mkdir -p ./volumes/logs && sudo chown -R 1654:1654 ./volumes/logs
       - logicnet-logs:/app/Logs
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      # 镜像内无 curl（且 NAS 构建沙箱内无法 apt 安装），用 bash /dev/tcp 发起 HTTP 探测
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf \"GET /health HTTP/1.0\\r\\n\\r\\n\" >&3; grep -q \" 200\" <&3'"]
       interval: 30s
       timeout: 5s
       retries: 3
