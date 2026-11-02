@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Furion;
 using Furion.JsonSerialization;
 using Furion.Logging;
@@ -16,6 +17,7 @@ using LogicNet.Web.Core.Job;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -69,6 +71,39 @@ public class Startup : AppStartup
         });
 
         services.AddCaptcha(App.Configuration);
+
+        // 匿名/高风险接口限流（框架原生 RateLimiting，按客户端 IP 固定窗口，规则见 HighRiskEndpointRateLimit）
+        services.AddRateLimiter(options =>
+        {
+            // 限流拒绝时返回规范 429 统一结果，而非 500/空响应
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = async (context, cancellationToken) =>
+            {
+                context.HttpContext.Response.ContentType = "application/json; charset=utf-8";
+                await context.HttpContext.Response.WriteAsJsonAsync(new TemplateRestfulResult<object>
+                {
+                    Succeeded = false,
+                    Code = StatusCodes.Status429TooManyRequests,
+                    Errors = "请求过于频繁，请稍后重试",
+                    Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                }, cancellationToken);
+            };
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+            {
+                var ruleIndex = HighRiskEndpointRateLimit.Match(httpContext.Request.Path);
+                if (ruleIndex < 0)
+                    return RateLimitPartition.GetNoLimiter("__no_limit__");
+                var rule = HighRiskEndpointRateLimit.Rules[ruleIndex];
+                var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return RateLimitPartition.GetFixedWindowLimiter($"{rule.PathSegment}:{clientIp}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = rule.PermitLimit,
+                        Window = rule.Window,
+                        QueueLimit = 0
+                    });
+            });
+        });
 
         // 注册 Mapster 对象映射，扫描 IRegister 映射配置（如 UserInfo/Mapper）
         services.AddObjectMapper();
@@ -173,6 +208,8 @@ public class Startup : AppStartup
         app.UseRouting();
 
         app.UseCorsAccessor();
+
+        app.UseRateLimiter();
 
         app.UseAuthentication();
         app.UseAuthorization();
