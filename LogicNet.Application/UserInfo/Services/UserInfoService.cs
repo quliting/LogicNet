@@ -31,7 +31,9 @@ public class UserInfoService(
                 if (inputDto.Mobile.IsNullOrEmpty() || !inputDto.Mobile.MatchPhoneNumber() ||
                     inputDto.PassWord.IsNullOrEmpty()) throw Oops.Bah(returnTips);
 
-                userInfo = await db.Queryable<Core.Entity.UserInfo>().Where(item => item.Mobile == inputDto.Mobile)
+                userInfo = await db.Queryable<Core.Entity.UserInfo>().Where(item =>
+                        item.Mobile == inputDto.Mobile &&
+                        item.Password == inputDto.PassWord.ToMD5Encrypt(false, false))
                     .FirstAsync();
                 if (userInfo is null) throw Oops.Bah(returnTips);
                 break;
