@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
@@ -38,7 +39,11 @@ public class Startup : AppStartup
                 "请通过环境变量 JWTSettings__IssuerSigningKey（双下划线）或 dotnet user-secrets 配置；" +
                 "生成强随机密钥示例：openssl rand -base64 48。详见 LogicNet.Application/applicationsettings.json 注释。");
 
-        services.AddConsoleFormatter();
+        services.AddConsoleFormatter(options =>
+        {
+            // 每条控制台日志携带请求 ID（Activity.Id / TraceIdentifier），实现链路贯穿
+            options.WithTraceId = true;
+        });
         services.AddJwt<JwtHandler>(enableGlobalAuthorize: true);
         // 供 JWTEncryption.Exchange 刷新令牌防重放黑名单使用（进程内，单实例有效）
         services.AddDistributedMemoryCache();
@@ -117,6 +122,8 @@ public class Startup : AppStartup
                 options.FileNameRule = item => string.Format(item, DateTime.UtcNow);
                 options.FileSizeLimitBytes = 1024 * 1024 * 30;
                 options.WriteFilter = logMsg => logMsg.LogLevel == LogLevel.Information;
+                // 每条文件日志携带请求 ID，与响应头 x-request-id 一致（日志文件位置约定不变）
+                options.WithTraceId = true;
             });
 
         services.AddFileLogging("Logs/Error-{0:yyyy}-{0:MM}-{0:dd}.log",
@@ -125,6 +132,7 @@ public class Startup : AppStartup
                 options.FileSizeLimitBytes = 1024 * 1024 * 30;
                 options.FileNameRule = item => string.Format(item, DateTime.UtcNow);
                 options.WriteFilter = logMsg => logMsg.LogLevel == LogLevel.Error;
+                options.WithTraceId = true;
             });
         //注册SqlSugar
         services.AddScoped<ISqlSugarClient>(s =>
@@ -197,6 +205,13 @@ public class Startup : AppStartup
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
     {
+        // 请求 ID 贯穿：响应头回写 x-request-id（与日志 WithTraceId 输出同源），便于客户端排障关联
+        app.Use(async (context, next) =>
+        {
+            context.Response.Headers["x-request-id"] = Activity.Current?.Id ?? context.TraceIdentifier;
+            await next();
+        });
+
         if (env.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();

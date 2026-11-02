@@ -67,6 +67,9 @@ public class TemplateRestfulResultProvider : IUnifyResultProvider
     /// <returns></returns>
     public IActionResult OnException(ExceptionContext context, ExceptionMetadata metadata)
     {
+        // 错误日志携带请求上下文（请求 ID/方法/路径），与控制台、文件日志的 WithTraceId 输出同源，可互相检索
+        Log.Error("请求处理异常，TraceId={TraceId}, Method={Method}, Path={Path}", context.Exception,
+            App.GetTraceId(), context.HttpContext?.Request.Method, context.HttpContext?.Request.Path.Value);
         return new JsonResult(LogicRESTfulResult(metadata.StatusCode, data: metadata.Data, errors: metadata.Errors)
             , UnifyContext.GetSerializerSettings(context));
     }
