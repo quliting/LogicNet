@@ -2,7 +2,7 @@
 
 namespace LogicNet.Application.Test.Service;
 
-[AllowAnonymous]
+// 移除匿名开放：该服务操作服务器文件（Aspose 读写 Word），全局授权要求登录后方可调用
 public class TestService : LogicBase
 {
     public void ChangeWordContentAsync()

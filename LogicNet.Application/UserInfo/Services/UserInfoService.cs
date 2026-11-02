@@ -153,7 +153,7 @@ public class UserInfoService(
         return true;
     }
 
-    [AllowAnonymous]
+    // 不再匿名开放：用户列表属于敏感数据，全局授权要求登录后方可访问
     public async Task<PagedList<GetUserListOutputDto>> GetUserListAsync(GetUserListInputDto inputDto)
     {
         var query = db.Queryable<Core.Entity.UserInfo>()
@@ -162,6 +162,8 @@ public class UserInfoService(
 
         var result = await query.Select<GetUserListOutputDto>()
             .PagedList(inputDto.PageIndex, inputDto.PageSize);
+        // 手机号脱敏后返回，避免明文批量外泄
+        foreach (var item in result.Data) item.Mobile = MaskMobile(item.Mobile);
         return result;
     }
 
@@ -185,6 +187,13 @@ public class UserInfoService(
         // MySQL 唯一索引冲突错误码 1062（兼容 SqlSugar 包装一层的情况）
         if (ex is MySqlConnector.MySqlException { Number: 1062 }) return true;
         return ex.InnerException is MySqlConnector.MySqlException { Number: 1062 };
+    }
+
+    private static string MaskMobile(string mobile)
+    {
+        // 手机号脱敏：11 位显示前 3 位与后 4 位，中间以 **** 代替；其他格式原样返回
+        if (mobile.IsNullOrEmpty() || mobile.Length != 11) return mobile;
+        return string.Concat(mobile.AsSpan(0, 3), "****", mobile.AsSpan(7));
     }
 }
     
