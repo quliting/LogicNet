@@ -34,14 +34,15 @@
     "DeleteDirectory": "Temp"
   },
   //JWT的配置
-  //【安全】IssuerSigningKey 严禁提交真实密钥到仓库，此处仅为占位。配置方式（任选其一）：
-  //  1. 环境变量：JWTSettings__IssuerSigningKey（双下划线）
-  //  2. 本地开发：在 LogicNet.Web.Entry 目录执行 dotnet user-secrets set "JWTSettings:IssuerSigningKey" "<密钥>"
+  //【安全】IssuerSigningKey 严禁提交真实密钥到仓库。注意：经实测（见 DEPLOY.md），Furion 在 Serve.Run 宿主下
+  // 捕获的 App.Configuration 不包含进程环境变量，因此请通过 json 文件配置（任选其一）：
+  //  1. 容器部署：挂载 secrets.json 到 /app/secrets.json（模板见仓库根目录 secrets.json.example，Furion 自动扫描加载）
+  //  2. 本地开发：在输出目录同级的 LogicNet.Application/applicationsettings.json 旁放置 secrets.json（已 gitignore）
   //  3. 生成强随机密钥：openssl rand -base64 48
+  // 本文件故意不保留 IssuerSigningKey 空占位，避免空值覆盖 secrets.json 中的真实密钥（后加载源覆盖先加载源）。
   // 未配置或长度不足 16 字符时应用启动将直接失败（fail-fast，见 LogicNet.Web.Core/Startup.cs）。
   "JWTSettings": {
     "ValidateIssuerSigningKey": true,
-    "IssuerSigningKey": "",
     "ValidateIssuer": false,
     "ValidIssuer": "qlt",
     "ValidateAudience": false,

@@ -31,13 +31,15 @@ public class Startup : AppStartup
 {
     public void ConfigureServices(IServiceCollection services)
     {
-        // JWT 签名密钥必须来自环境变量/用户机密（仓库内仅为占位），未配置或过短时 fail-fast 并给出配置指引
+        // JWT 签名密钥必须来自机密配置（仓库内不存放），未配置或过短时 fail-fast 并给出配置指引。
+        // 注意：Furion 在 Serve.Run 宿主下捕获的 App.Configuration 不含进程环境变量（实测），
+        // 容器/本地统一通过 secrets.json（Furion 自动扫描输出目录 *.json）注入，见 DEPLOY.md。
         var issuerSigningKey = App.Configuration["JWTSettings:IssuerSigningKey"];
         if (string.IsNullOrWhiteSpace(issuerSigningKey) || issuerSigningKey.Length < 16)
             throw new InvalidOperationException(
                 "未配置 JWT 签名密钥（JWTSettings:IssuerSigningKey）或长度不足 16 个字符。" +
-                "请通过环境变量 JWTSettings__IssuerSigningKey（双下划线）或 dotnet user-secrets 配置；" +
-                "生成强随机密钥示例：openssl rand -base64 48。详见 LogicNet.Application/applicationsettings.json 注释。");
+                "请放置 secrets.json（模板见 secrets.json.example，容器挂载到 /app/secrets.json）；" +
+                "生成强随机密钥示例：openssl rand -base64 48。详见 DEPLOY.md。");
 
         services.AddConsoleFormatter(options =>
         {

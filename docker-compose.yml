@@ -1,11 +1,13 @@
 name: logicnet
 
-# LogicNet 应用编排。配置通过同目录 .env 注入（参照 .env.example 生成）。
+# LogicNet 应用编排。敏感配置通过同目录 secrets.json 挂载注入（模板见 secrets.json.example；
+# 经实测 Furion 捕获的 App.Configuration 不含进程环境变量，故不使用环境变量传密钥，详见 DEPLOY.md）。
+# .env 仅用于 compose 变量插值（APP_PORT、方案 B 的 DB_ROOT_PASSWORD）。
 # 数据库两种模式（默认 A）：
-#   A. 复用外部 MySQL（默认）：.env 的 DB_CONNECTION_STRING 指向已有实例，无需其他改动。
+#   A. 复用外部 MySQL（默认）：secrets.json 的 ConnectionString 指向已有实例，无需其他改动。
 #   B. compose 内置 MySQL：启动命令追加覆盖文件（数据持久化在 logicnet-mysql 卷）：
 #        docker compose -f docker-compose.yml -f docker-compose.mysql.yml up -d
-#      并把 .env 的 DB_CONNECTION_STRING 改为（密码与 DB_ROOT_PASSWORD 一致）：
+#      并把 secrets.json 的连接串改为（密码与 .env 的 DB_ROOT_PASSWORD 一致）：
 #        Data Source=mysql;Database=logicnet;User ID=root;Password=<DB_ROOT_PASSWORD>;pooling=true;port=3306;CharSet=utf8mb4;SslMode=none
 #      注意：内置模式不要在宿主再占用 3306。
 
@@ -20,14 +22,12 @@ services:
     ports:
       # 左侧为宿主端口，可在 .env 用 APP_PORT 覆盖
       - "${APP_PORT:-8080}:8080"
-    env_file:
-      - .env
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      # 覆盖 appsettings.json 占位（双下划线对应配置层级），密钥只存在于 NAS 本地 .env
-      ConnectionConfigs__0__ConnectionString: "${DB_CONNECTION_STRING}"
-      JWTSettings__IssuerSigningKey: "${JWT_ISSUER_SIGNING_KEY}"
     volumes:
+      # 机密配置（JWT 密钥、数据库连接串）：只读挂载，宿主上属主应为容器内 app 用户（uid 1654）、
+      # 权限 600。准备步骤见 DEPLOY.md；模板见 secrets.json.example。
+      - ./secrets.json:/app/secrets.json:ro
       # 命名卷持久化应用日志（/app/Logs，属主为容器内 app 用户 uid 1654）。
       # 若想直接在 NAS 文件管理器查看，可改为绑定挂载，例如：
       #   - ./volumes/logs:/app/Logs

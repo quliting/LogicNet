@@ -26,8 +26,9 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      # 首次启动需初始化 InnoDB 数据文件，在机械硬盘 NAS 上可能超过 2 分钟，start_period 务必放宽
+      retries: 12
+      start_period: 120s
 
 volumes:
   logicnet-mysql:

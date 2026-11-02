@@ -5,38 +5,63 @@
 ## 前置条件
 
 - Docker Engine 20.10+ 与 docker compose v2（`docker compose version` 可查）
-- 一个可用的 MySQL 8.x 实例（复用现有实例或使用 compose 内置 MySQL，见下）
+- 一个可用的 MySQL 8.x 实例（复用现有实例，或使用 compose 内置 MySQL）
+
+## 关键机制：密钥为什么走 secrets.json 而不是环境变量
+
+经实测：Furion 在 `Serve.Run` 宿主路径下捕获的 `App.Configuration` **不包含进程环境变量**
+（显式 `docker run -e JWTSettings__IssuerSigningKey=...` 启动仍会触发"未配置 JWT 密钥"的 fail-fast）。
+因此 JWT 密钥与数据库连接串通过 **挂载 secrets.json** 注入（Furion 会自动扫描输出目录的 *.json，
+后加载源覆盖先加载源中的同名字段）。镜像内不含任何密钥；`.env` 只保留 compose 插值用的
+`APP_PORT` 与（方案 B 的）`DB_ROOT_PASSWORD`。
 
 ## 1. 准备配置
 
 ```bash
-cp .env.example .env
+cp .env.example .env                      # 按需修改 APP_PORT；方案 B 必填 DB_ROOT_PASSWORD
+cp secrets.json.example secrets.json      # 填入真实 JWT 密钥与数据库连接串
 ```
 
-编辑 `.env`：
+`secrets.json` 要点：
 
-| 变量 | 说明 | 生成/取值 |
+| 字段 | 说明 | 生成/取值 |
 | --- | --- | --- |
-| `APP_PORT` | 宿主对外端口 | 默认 8080，被占用则改其他端口 |
-| `JWT_ISSUER_SIGNING_KEY` | JWT 签名密钥（≥16 字符） | `openssl rand -base64 48`，**现场生成，不要复用仓库历史中的旧密钥** |
-| `DB_CONNECTION_STRING` | MySQL 连接串 | 见 `.env.example` 注释（外部实例 / 内置 mysql 两种写法） |
-| `DB_ROOT_PASSWORD` | 仅内置 MySQL 模式使用 | `openssl rand -base64 32` |
+| `JWTSettings:IssuerSigningKey` | JWT 签名密钥（≥16 字符） | `openssl rand -base64 48`，**现场生成，不要复用仓库历史中的旧密钥** |
+| `ConnectionConfigs:0:ConnectionString` | MySQL 连接串 | 方案 A 指向已有实例；方案 B 用 `Data Source=mysql;Database=logicnet;User ID=root;Password=<DB_ROOT_PASSWORD>;...` |
 
-数据库方案切换：默认复用外部 MySQL；改用 compose 内置 MySQL 时，启动命令追加覆盖文件，并把 `.env` 的 `DB_CONNECTION_STRING` 指向 `Data Source=mysql`（详见 `docker-compose.yml` 文件头注释）：
+权限（容器以 uid 1654 非 root 运行，须能读取该文件；其他宿主用户不可读）：
 
 ```bash
-# 方案 B 的所有 compose 命令都带两个 -f；也可先 export COMPOSE_FILE=docker-compose.yml:docker-compose.mysql.yml 省略
-docker compose -f docker-compose.yml -f docker-compose.mysql.yml up -d
+chmod 600 secrets.json
+# 把属主改为容器内 app 用户（借助已有镜像免 sudo）：
+docker run --rm -u 0 -v "$PWD":/mnt mcr.microsoft.com/dotnet/aspnet:9.0 chown 1654:1654 /mnt/secrets.json
 ```
 
-注意宿主不要再占用 3306，数据持久化在 `logicnet-mysql` 卷。
+数据库方案切换：默认方案 A 复用外部 MySQL；方案 B（compose 内置 MySQL）启动时追加覆盖文件，
+并把 `secrets.json` 连接串指向 `Data Source=mysql`（密码与 `.env` 的 `DB_ROOT_PASSWORD` 一致）：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.mysql.yml up -d
+# 或 export COMPOSE_FILE=docker-compose.yml:docker-compose.mysql.yml 后省略 -f 参数
+```
+
+注意方案 B 下宿主不要再占用 3306，数据持久化在 `logicnet-mysql` 卷。
 
 ## 2. 构建与启动
 
+**构建完成 ≠ 部署完成**：`build` 只产出镜像，`up -d` 才会创建/更新容器。推荐一键脚本：
+
+```bash
+./deploy.sh                        # 方案 A
+USE_INTERNAL_MYSQL=1 ./deploy.sh   # 方案 B
+```
+
+或手工分步：
+
 ```bash
 docker compose build        # 构建镜像（多阶段，SDK 构建 + aspnet 运行，非 root）
-docker compose up -d        # 后台启动
-docker compose ps           # 查看状态（healthy 需等 start_period 30s 后）
+docker compose up -d        # 后台启动（方案 B 请带两个 -f）
+docker compose ps           # 查看状态（首次启动 MySQL 初始化较慢，healthy 需等 1-3 分钟）
 ```
 
 健康检查：
@@ -64,8 +89,7 @@ mysql -h <主机> -u <账号> -p LogicNet < Sql/2026-11-02_P0_UserInfo唯一索�
 
 ```bash
 git pull                  # 或重新传输源码
-docker compose build      # 重新构建（层缓存使增量构建很快）
-docker compose up -d      # 滚动替换容器
+./deploy.sh               # 重新构建并滚动替换容器（构建完成 ≠ 部署完成，脚本内含 up -d）
 ```
 
 ## 5. 日志
@@ -79,6 +103,8 @@ docker volume inspect logicnet_logicnet-logs   # 文件日志所在卷（Logs/ap
 
 ## 6. 其他说明
 
-- 镜像内不含任何密钥：JWT 密钥与连接串均通过 `.env` → 环境变量在运行时注入。
+- 镜像内不含任何密钥：JWT 密钥与连接串经 `secrets.json` 只读挂载注入。
 - 镜像不含 Aspose.Words（本地未跟踪商业二进制）：构建上下文已排除 `LogicNet.Application/Dll/`，依赖它的演示用 `TestService` 在容器构建中自动排除，业务接口不受影响。
 - Windows 专用的 COM 引用在非 Windows 构建时自动跳过，不影响 Linux/macOS/容器构建。
+- 已知平台兼容：部分 NAS（如飞牛）的定制内核上，BuildKit 构建沙箱内运行 apt-get 会段错误（exit 139），
+  因此镜像不安装额外工具，compose 健康检查改用镜像自带 bash 的 /dev/tcp 探测 `/health`。
