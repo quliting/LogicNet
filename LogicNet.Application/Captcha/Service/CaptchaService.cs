@@ -25,8 +25,12 @@ public class CaptchaService(ICaptcha captcha) : LogicBase
         };
     }
 
+    /// <summary>
+    ///     独立校验验证码：成功后立即销毁（一次性），与登录链路 captcha.Validate(key, code, true) 行为一致，
+    ///     防止同一验证码被重复用于批量请求
+    /// </summary>
     public bool ValidateAsync(ValidateInputDto inputDto)
     {
-        return captcha.Validate(inputDto.Key, inputDto.Code, false);
+        return captcha.Validate(inputDto.Key, inputDto.Code, true);
     }
 }
