@@ -60,6 +60,9 @@ public class Startup : AppStartup
 
         services.AddCaptcha(App.Configuration);
 
+        // 注册 Mapster 对象映射，扫描 IRegister 映射配置（如 UserInfo/Mapper）
+        services.AddObjectMapper();
+
         services.AddSchedule(item => { item.AddJob<DeleteDirJob>(TriggerBuilder.Period(1000)); });
 
         // 例子一：根据日志级别输出
