@@ -236,5 +236,18 @@ public class Startup : AppStartup
             endpoints.MapHubs();
             endpoints.MapControllers();
         });
+
+        // 数据库初始化（CodeFirst 建表 + 角色种子，幂等）：失败仅记录错误日志不阻断启动，
+        // 保持"无库也可启动"的既有行为，错误详情见 Logs/Error-*.log
+        try
+        {
+            using var scope = app.ApplicationServices.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ISqlSugarClient>();
+            DatabaseInitializer.Initialize(db);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("数据库初始化失败，请检查连接串与账号权限（表结构/种子数据未就绪）。", ex);
+        }
     }
 }
