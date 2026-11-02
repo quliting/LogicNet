@@ -201,6 +201,9 @@ public class Startup : AppStartup
         StaticConfig.CustomSnowFlakeFunc = YitIdHelper.NextId;
 
         services.AddSignalR();
+
+        // 健康检查：/health 供容器探活，包含数据库连通性
+        services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -235,6 +238,21 @@ public class Startup : AppStartup
         {
             endpoints.MapHubs();
             endpoints.MapControllers();
+            // 匿名健康检查端点（非 MVC 端点，不受全局授权影响；统一返回 JSON 明细）
+            endpoints.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+            {
+                ResponseWriter = async (context, report) =>
+                {
+                    context.Response.ContentType = "application/json; charset=utf-8";
+                    await context.Response.WriteAsJsonAsync(new
+                    {
+                        status = report.Status.ToString(),
+                        checks = report.Entries.ToDictionary(
+                            item => item.Key,
+                            item => new { status = item.Value.Status.ToString(), item.Value.Description })
+                    });
+                }
+            });
         });
 
         // 数据库初始化（CodeFirst 建表 + 角色种子，幂等）：失败仅记录错误日志不阻断启动，
