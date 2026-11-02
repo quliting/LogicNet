@@ -402,3 +402,8 @@ FodyWeavers.xsd
 # Local rule folders (agent/tooling rules, not for commit)
 rule/
 [Rr]ule/
+
+# 部署机密：.env 只存在于部署机本地，模板 .env.example 仍可提交
+.env
+.env.*
+!.env.example
