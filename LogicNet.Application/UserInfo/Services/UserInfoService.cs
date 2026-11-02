@@ -70,8 +70,59 @@ public class UserInfoService(
 
         var accessToken = JWTEncryption.Encrypt(payload);
 
+        // 颁发刷新令牌（有效期 7 天），通过 x-access-token 响应头下发，保持登录返回体契约不变
+        if (App.HttpContext != null)
+            App.HttpContext.Response.Headers["x-access-token"] =
+                JWTEncryption.GenerateRefreshToken(accessToken, 60 * 24 * 7);
+
         // _hubClients..LoginAsync(inputDto);
         return accessToken;
+    }
+
+    /// <summary>
+    ///     刷新令牌：用过期的访问令牌 + 刷新令牌换取新访问令牌，刷新令牌同步轮换（经 x-access-token 响应头下发）
+    /// </summary>
+    [AllowAnonymous]
+    public Task<string> RefreshAsync(RefreshInputDto inputDto)
+    {
+        if (TokenRevocationStore.IsRevoked(inputDto.RefreshToken)) throw Oops.Bah("刷新令牌已失效，请重新登录");
+
+        // Exchange 内部校验：访问令牌必须已过期、刷新令牌签名与有效期合法、两者配对、且未重放
+        var newAccessToken = JWTEncryption.Exchange(inputDto.Token, inputDto.RefreshToken);
+        if (newAccessToken.IsNullOrEmpty()) throw Oops.Bah("刷新令牌无效或已过期，请重新登录");
+
+        // 吊销旧刷新令牌并轮换签发新刷新令牌
+        var refreshJwt = JWTEncryption.ReadJwtToken(inputDto.RefreshToken);
+        TokenRevocationStore.Revoke(inputDto.RefreshToken, refreshJwt?.ValidTo ?? DateTime.UtcNow.AddDays(7));
+        if (App.HttpContext != null)
+            App.HttpContext.Response.Headers["x-access-token"] =
+                JWTEncryption.GenerateRefreshToken(newAccessToken, 60 * 24 * 7);
+
+        return Task.FromResult(newAccessToken);
+    }
+
+    /// <summary>
+    ///     登出：吊销当前访问令牌（以及请求头 x-access-token 随附的刷新令牌），吊销后令牌到期前调用接口将返回 401
+    /// </summary>
+    public Task<bool> LogoutAsync()
+    {
+        if (App.HttpContext is not DefaultHttpContext httpContext) return Task.FromResult(false);
+
+        var accessToken = JWTEncryption.GetJwtBearerToken(httpContext);
+        if (!accessToken.IsNullOrEmpty())
+        {
+            var jwt = JWTEncryption.ReadJwtToken(accessToken);
+            TokenRevocationStore.Revoke(accessToken, jwt?.ValidTo ?? DateTime.UtcNow.AddMinutes(99));
+        }
+
+        var refreshToken = httpContext.Request.Headers["x-access-token"].ToString();
+        if (!refreshToken.IsNullOrEmpty())
+        {
+            var refreshJwt = JWTEncryption.ReadJwtToken(refreshToken);
+            TokenRevocationStore.Revoke(refreshToken, refreshJwt?.ValidTo ?? DateTime.UtcNow.AddDays(7));
+        }
+
+        return Task.FromResult(true);
     }
 
 

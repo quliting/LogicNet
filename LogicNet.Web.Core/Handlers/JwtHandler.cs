@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using System.Threading.Tasks;
 using Furion.Authorization;
+using Furion.DataEncryption;
 using LogicNet.Core.Entity;
 using LogicNet.Core.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -16,6 +17,11 @@ public class JwtHandler : AppAuthorizeHandler
     {
         // 令牌必须携带有效用户标识
         if (!long.TryParse(httpContext.User.FindFirstValue(JwtClaimNames.UserId), out var userId) || userId <= 0)
+            return false;
+
+        // 已登出/吊销的令牌直接拒绝
+        var bearerToken = JWTEncryption.GetJwtBearerToken(httpContext);
+        if (!string.IsNullOrEmpty(bearerToken) && TokenRevocationStore.IsRevoked(bearerToken))
             return false;
 
         // 用户必须真实存在且未被软删除（软删除由全局查询过滤器保证过滤）

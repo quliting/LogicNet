@@ -30,6 +30,8 @@ public class Startup : AppStartup
     {
         services.AddConsoleFormatter();
         services.AddJwt<JwtHandler>(enableGlobalAuthorize: true);
+        // 供 JWTEncryption.Exchange 刷新令牌防重放黑名单使用（进程内，单实例有效）
+        services.AddDistributedMemoryCache();
         services.AddCorsAccessor();
         services.AddControllers().AddJsonOptions(item =>
             {
