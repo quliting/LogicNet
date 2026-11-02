@@ -1,12 +1,10 @@
 ﻿using Bing;
-using LogicNet.Application.Hub;
 using LogicNet.Application.UserInfo.DTO;
 using LogicNet.Core;
 using LogicNet.Core.Entity;
 using LogicNet.Core.Security;
 using Masuit.Tools;
 using Masuit.Tools.Models;
-using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 
 namespace LogicNet.Application.UserInfo.Services;
@@ -20,7 +18,6 @@ public class UserInfoService(
     ICaptcha captcha) : LogicBase
 {
     private readonly ISqlSugarClient db = db;
-    private readonly IHubClients<UserHub> _hubClients;
 
     [AllowAnonymous]
     public async Task<string> LoginAsync(LoginInputDto inputDto)
@@ -74,7 +71,6 @@ public class UserInfoService(
             App.HttpContext.Response.Headers["x-access-token"] =
                 JWTEncryption.GenerateRefreshToken(accessToken, 60 * 24 * 7);
 
-        // _hubClients..LoginAsync(inputDto);
         return accessToken;
     }
 

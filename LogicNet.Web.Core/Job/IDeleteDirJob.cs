@@ -17,7 +17,7 @@ public class DeleteDirJob : IJob
             .Split(",", StringSplitOptions.RemoveEmptyEntries);
 
         foreach (var directory in directories.Select(dir =>
-                     Path.Combine(App.WebHostEnvironment.WebRootPath, dir).AsDirectory()))
+                     new DirectoryInfo(Path.Combine(App.WebHostEnvironment.WebRootPath, dir))))
         {
             if (!directory.Exists) continue;
 
