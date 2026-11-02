@@ -12,7 +12,13 @@ public class LoginInputDto
     public string PassWord { get; set; }
 
     /// <summary>
-    /// 图形验证码
+    ///     验证码存储键
+    /// </summary>
+    [Required(ErrorMessage = "验证码键不能为空")]
+    public string Key { get; set; }
+
+    /// <summary>
+    ///     图形验证码
     /// </summary>
     [Required(ErrorMessage = "验证码不能为空")]
     public string Code { get; set; }

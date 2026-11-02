@@ -15,7 +15,8 @@ namespace LogicNet.Application.UserInfo.Services;
 /// </summary>
 public class UserInfoService(
     ISqlSugarClient db,
-    Repository<Core.Entity.UserInfo> userRepository) : LogicBase
+    Repository<Core.Entity.UserInfo> userRepository,
+    ICaptcha captcha) : LogicBase
 {
     private readonly ISqlSugarClient db = db;
     private readonly IHubClients<UserHub> _hubClients;
@@ -24,6 +25,8 @@ public class UserInfoService(
     public async Task<string> LoginAsync(LoginInputDto inputDto)
     {
         var returnTips = "用户名密码错误";
+        if (!captcha.Validate(inputDto.Key, inputDto.Code, true)) throw Oops.Bah("验证码错误或已失效");
+
         Core.Entity.UserInfo userInfo = null;
         switch (inputDto.LoginType)
         {
