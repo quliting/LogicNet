@@ -113,7 +113,8 @@ public class Startup : AppStartup
         // 注册 Mapster 对象映射，扫描 IRegister 映射配置（如 UserInfo/Mapper）
         services.AddObjectMapper();
 
-        services.AddSchedule(item => { item.AddJob<DeleteDirJob>(TriggerBuilder.Period(1000)); });
+        // 临时文件清理：每分钟执行一次即可（10 分钟过期阈值不受触发频率影响），避免每秒扫盘的 IO 开销
+        services.AddSchedule(item => { item.AddJob<DeleteDirJob>(TriggerBuilder.Period(60_000)); });
 
         // 例子一：根据日志级别输出
         services.AddFileLogging("Logs/application-{0:yyyy}-{0:MM}-{0:dd}.log",
