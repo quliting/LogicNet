@@ -1,16 +1,26 @@
-﻿using Furion.Authorization;
+﻿using System.Security.Claims;
+using System.Threading.Tasks;
+using Furion.Authorization;
+using LogicNet.Core.Entity;
+using LogicNet.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
-using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using SqlSugar;
 
 namespace LogicNet.Web.Core;
 
 public class JwtHandler : AppAuthorizeHandler
 {
-    public override Task<bool> PipelineAsync(AuthorizationHandlerContext context, DefaultHttpContext httpContext)
+    public override async Task<bool> PipelineAsync(AuthorizationHandlerContext context, DefaultHttpContext httpContext)
     {
-        // 这里写您的授权判断逻辑，授权通过返回 true，否则返回 false
+        // 令牌必须携带有效用户标识
+        if (!long.TryParse(httpContext.User.FindFirstValue(JwtClaimNames.UserId), out var userId) || userId <= 0)
+            return false;
 
-        return Task.FromResult(true);
+        // 用户必须真实存在且未被软删除（软删除由全局查询过滤器保证过滤）
+        var db = httpContext.RequestServices.GetService<ISqlSugarClient>();
+        if (db == null) return false;
+        return await db.Queryable<UserInfo>().AnyAsync(x => x.Id == userId);
     }
 }

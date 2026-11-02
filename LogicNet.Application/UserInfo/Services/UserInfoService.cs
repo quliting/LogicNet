@@ -4,9 +4,11 @@ using LogicNet.Application.Hub;
 using LogicNet.Application.UserInfo.DTO;
 using LogicNet.Core;
 using LogicNet.Core.Entity;
+using LogicNet.Core.Security;
 using Masuit.Tools;
 using Masuit.Tools.Models;
 using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
 
 namespace LogicNet.Application.UserInfo.Services;
 
@@ -53,11 +55,20 @@ public class UserInfoService(
                 break;
         }
 
-        var accessToken = JWTEncryption.Encrypt(new Dictionary<string, object>
+        // 查询用户角色写入令牌声明，供 [Authorize(Roles = ...)] 做权限控制
+        var roleNames = await db.Queryable<UserRole, Role>((ur, r) => ur.RoleId == r.Id)
+            .Where((ur, r) => ur.UserId == userInfo.Id)
+            .Select((ur, r) => r.Name)
+            .ToListAsync();
+
+        var payload = new Dictionary<string, object>
         {
-            { "UserId", userInfo.Id },
-            { "Account", userInfo.UserName }
-        });
+            { JwtClaimNames.UserId, userInfo.Id },
+            { JwtClaimNames.Account, userInfo.UserName }
+        };
+        if (roleNames.Count > 0) payload.Add(ClaimTypes.Role, roleNames);
+
+        var accessToken = JWTEncryption.Encrypt(payload);
 
         // _hubClients..LoginAsync(inputDto);
         return accessToken;
