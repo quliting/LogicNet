@@ -28,6 +28,14 @@ public class Startup : AppStartup
 {
     public void ConfigureServices(IServiceCollection services)
     {
+        // JWT 签名密钥必须来自环境变量/用户机密（仓库内仅为占位），未配置或过短时 fail-fast 并给出配置指引
+        var issuerSigningKey = App.Configuration["JWTSettings:IssuerSigningKey"];
+        if (string.IsNullOrWhiteSpace(issuerSigningKey) || issuerSigningKey.Length < 16)
+            throw new InvalidOperationException(
+                "未配置 JWT 签名密钥（JWTSettings:IssuerSigningKey）或长度不足 16 个字符。" +
+                "请通过环境变量 JWTSettings__IssuerSigningKey（双下划线）或 dotnet user-secrets 配置；" +
+                "生成强随机密钥示例：openssl rand -base64 48。详见 LogicNet.Application/applicationsettings.json 注释。");
+
         services.AddConsoleFormatter();
         services.AddJwt<JwtHandler>(enableGlobalAuthorize: true);
         // 供 JWTEncryption.Exchange 刷新令牌防重放黑名单使用（进程内，单实例有效）
