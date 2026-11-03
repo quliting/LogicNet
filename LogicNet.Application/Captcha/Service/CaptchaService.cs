@@ -10,8 +10,13 @@ public class CaptchaService(ICaptcha captcha) : LogicBase
 
     public async Task<GetCaptchaOutputDto> GetCaptchaAsync()
     {
-        var tempDir = Path.Combine(App.WebHostEnvironment.WebRootPath, "Temp");
-        if (Directory.Exists(tempDir) && Directory.GetFiles(tempDir).Length >= MaxCaptchaFileCount)
+        // 发布/容器环境可能没有 wwwroot 目录（WebRootPath 为 null），兜底到内容根下并确保 Temp 存在，
+        // 否则 Path.Combine 抛空路径异常，验证码接口直接 500。
+        var webRoot = App.WebHostEnvironment.WebRootPath;
+        if (string.IsNullOrEmpty(webRoot)) webRoot = Path.Combine(App.WebHostEnvironment.ContentRootPath, "wwwroot");
+        var tempDir = Path.Combine(webRoot, "Temp");
+        Directory.CreateDirectory(tempDir);
+        if (Directory.GetFiles(tempDir).Length >= MaxCaptchaFileCount)
             throw Oops.Bah("验证码请求过于频繁，请稍后重试");
 
         var fileName = YitIdHelper.NextId() + ".png";
@@ -20,7 +25,8 @@ public class CaptchaService(ICaptcha captcha) : LogicBase
         await info.Bytes.CopyToSaveAsync(Path.Combine(tempDir, fileName));
         return new GetCaptchaOutputDto
         {
-            Url = Path.Combine(App.GetConfig<string>("AppSettings:Host"), "Temp", fileName),
+            // 返回根相对路径：避免 AppSettings:Host 在不同部署环境（容器端口/域名）下拼出不可访问的绝对地址
+            Url = $"/Temp/{fileName}",
             Key = key
         };
     }
