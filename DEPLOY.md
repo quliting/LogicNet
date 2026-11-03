@@ -120,6 +120,8 @@ ssh quliting@192.168.2.104 "cd ~/logicnet && ./deploy.sh"
 - `deploy.sh` 会自动识别已存在的 `logicnet-mysql` 容器并叠加 `docker-compose.mysql.yml`（方案 B），
   日常更新无需再传 `USE_INTERNAL_MYSQL=1`。
 - 每次构建前旧镜像会打上 `logicnet:prev` 标签；`deploy.sh` 内含 `up -d` 与 `/health` 等待（最长 2 分钟）。
+- 实测耗时（NAS，方案 B）：有代码变更的完整更新约 **4 分 34 秒**（重建镜像 + 滚动替换 + 健康检查）；
+  同一 HEAD 连跑第二次约 **5 秒**（构建缓存命中、容器不重建），两次 `/health` 均为 200。
 
 **回滚**（在 NAS 上执行，回到上一个成功部署的镜像）：
 
