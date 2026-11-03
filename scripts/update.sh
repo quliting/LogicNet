@@ -20,11 +20,11 @@ REF="${REF:-HEAD}"
 
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "当前目录不是 git 仓库" >&2; exit 1; }
 
-echo "==> 同步 $REF 到 $NAS_USER@$NAS_HOST:$NAS_DIR（仅 git 跟踪文件）"
+echo "==> 同步 ${REF} 到 ${NAS_USER}@${NAS_HOST}:${NAS_DIR}（仅 git 跟踪文件）"
 git archive --format=tar "$REF" | ssh -o BatchMode=yes "$NAS_USER@$NAS_HOST" \
   "tar -xf - -C '$NAS_DIR' && echo '源码同步完成'"
 
 echo "==> 远端构建并滚动更新"
 ssh -o BatchMode=yes "$NAS_USER@$NAS_HOST" "cd '$NAS_DIR' && ./deploy.sh"
 
-echo "==> 更新完成：http://$NAS_HOST:8080/health"
+echo "==> 更新完成：http://${NAS_HOST}:8080/health"
