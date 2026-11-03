@@ -28,6 +28,9 @@ services:
       # 机密配置（JWT 密钥、数据库连接串）：只读挂载，宿主上属主应为容器内 app 用户（uid 1654）、
       # 权限 600。准备步骤见 DEPLOY.md；模板见 secrets.json.example。
       - ./secrets.json:/app/secrets.json:ro
+      # 容器内 DNS：部分 NAS（如飞牛）生成的 /etc/resolv.conf 为 640 root:root，非 root 应用用户读不到，
+      # 会导致无法解析 mysql 等服务名。只读挂载仓库内可读的 resolv.conf，显式使用 Docker 内置 DNS。
+      - ./resolv.conf:/etc/resolv.conf:ro
       # 命名卷持久化应用日志（/app/Logs，属主为容器内 app 用户 uid 1654）。
       # 若想直接在 NAS 文件管理器查看，可改为绑定挂载，例如：
       #   - ./volumes/logs:/app/Logs

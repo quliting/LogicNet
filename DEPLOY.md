@@ -27,7 +27,10 @@ cp secrets.json.example secrets.json      # 填入真实 JWT 密钥与数据库�
 | 字段 | 说明 | 生成/取值 |
 | --- | --- | --- |
 | `JWTSettings:IssuerSigningKey` | JWT 签名密钥（≥16 字符） | `openssl rand -base64 48`，**现场生成，不要复用仓库历史中的旧密钥** |
-| `ConnectionConfigs:0:ConnectionString` | MySQL 连接串 | 方案 A 指向已有实例；方案 B 用 `Data Source=mysql;Database=logicnet;User ID=root;Password=<DB_ROOT_PASSWORD>;...` |
+| `ConnectionConfigs:0:ConnectionString` | MySQL 连接串 | 方案 A 指向已有实例；方案 B 用 `Data Source=mysql;Database=logicnet;User ID=root;Password=<DB_ROOT_PASSWORD>;...;SslMode=none;AllowPublicKeyRetrieval=True` |
+
+> MySQL 8 默认使用 `caching_sha2_password`：在 `SslMode=none` 的连接串中必须追加
+> `AllowPublicKeyRetrieval=True`，否则应用日志报 `Authentication method 'caching_sha2_password' failed`。
 
 权限（容器以 uid 1654 非 root 运行，须能读取该文件；其他宿主用户不可读）：
 
@@ -36,6 +39,10 @@ chmod 600 secrets.json
 # 把属主改为容器内 app 用户（借助已有镜像免 sudo）：
 docker run --rm -u 0 -v "$PWD":/mnt mcr.microsoft.com/dotnet/aspnet:9.0 chown 1654:1654 /mnt/secrets.json
 ```
+
+`resolv.conf` 为仓库自带文件，无需修改：部分 NAS（如飞牛）的 Docker Engine 生成的 `/etc/resolv.conf`
+是 `640 root:root`，容器内非 root 用户读不到，会导致服务名（如 `mysql`）解析失败。compose 将其只读
+挂载到容器内 `/etc/resolv.conf`，显式使用 Docker 内置 DNS（127.0.0.11），保持非 root 运行。
 
 数据库方案切换：默认方案 A 复用外部 MySQL；方案 B（compose 内置 MySQL）启动时追加覆盖文件，
 并把 `secrets.json` 连接串指向 `Data Source=mysql`（密码与 `.env` 的 `DB_ROOT_PASSWORD` 一致）：
@@ -54,14 +61,19 @@ docker compose -f docker-compose.yml -f docker-compose.mysql.yml up -d
 ```bash
 ./deploy.sh                        # 方案 A
 USE_INTERNAL_MYSQL=1 ./deploy.sh   # 方案 B
+./rebuild.sh                       # 忽略构建缓存全量重建（镜像存在但内容未更新时使用）
 ```
 
-或手工分步：
+`deploy.sh` 默认使用 legacy builder（`DOCKER_BUILDKIT=0`），以绕开飞牛 NAS 上 BuildKit 构建沙箱的
+段错误（exit 139）；其他平台想用 BuildKit 时加 `USE_BUILDKIT=1`。脚本内含 `up -d` 和健康检查等待，
+不会出现"构建完成但容器仍跑旧镜像"的情况。
+
+或手工分步（NAS 上同样需要 `DOCKER_BUILDKIT=0`）：
 
 ```bash
-docker compose build        # 构建镜像（多阶段，SDK 构建 + aspnet 运行，非 root）
-docker compose up -d        # 后台启动（方案 B 请带两个 -f）
-docker compose ps           # 查看状态（首次启动 MySQL 初始化较慢，healthy 需等 1-3 分钟）
+DOCKER_BUILDKIT=0 docker compose build   # 构建镜像（多阶段，SDK 构建 + aspnet 运行，非 root）
+docker compose up -d                     # 后台启动（方案 B 请带两个 -f）
+docker compose ps                        # 查看状态（首次启动 MySQL 初始化较慢，healthy 需等 1-3 分钟）
 ```
 
 健康检查：
@@ -90,6 +102,7 @@ mysql -h <主机> -u <账号> -p LogicNet < Sql/2026-11-02_P0_UserInfo唯一索�
 ```bash
 git pull                  # 或重新传输源码
 ./deploy.sh               # 重新构建并滚动替换容器（构建完成 ≠ 部署完成，脚本内含 up -d）
+./rebuild.sh              # 构建缓存疑似命中旧代码时，忽略缓存全量重建
 ```
 
 ## 5. 日志
@@ -106,5 +119,8 @@ docker volume inspect logicnet_logicnet-logs   # 文件日志所在卷（Logs/ap
 - 镜像内不含任何密钥：JWT 密钥与连接串经 `secrets.json` 只读挂载注入。
 - 镜像不含 Aspose.Words（本地未跟踪商业二进制）：构建上下文已排除 `LogicNet.Application/Dll/`，依赖它的演示用 `TestService` 在容器构建中自动排除，业务接口不受影响。
 - Windows 专用的 COM 引用在非 Windows 构建时自动跳过，不影响 Linux/macOS/容器构建。
-- 已知平台兼容：部分 NAS（如飞牛）的定制内核上，BuildKit 构建沙箱内运行 apt-get 会段错误（exit 139），
-  因此镜像不安装额外工具，compose 健康检查改用镜像自带 bash 的 /dev/tcp 探测 `/health`。
+- 已知平台兼容（飞牛 NAS）：
+  1. BuildKit 构建沙箱内运行 apt-get / dotnet publish 会段错误（exit 139）。镜像不安装额外工具，
+     compose 健康检查改用镜像自带 bash 的 /dev/tcp 探测 `/health`；构建默认走 legacy builder（见第 2 节）。
+  2. Docker Engine 生成的 `/etc/resolv.conf`、`/etc/hosts` 为 `640 root:root`，容器内非 root 用户
+     无法读取，导致域名解析失败。compose 只读挂载仓库内 `resolv.conf`（127.0.0.11）解决，见第 1 节。
