@@ -59,8 +59,8 @@ docker compose -f docker-compose.yml -f docker-compose.mysql.yml up -d
 **构建完成 ≠ 部署完成**：`build` 只产出镜像，`up -d` 才会创建/更新容器。推荐一键脚本：
 
 ```bash
-./deploy.sh                        # 方案 A
-USE_INTERNAL_MYSQL=1 ./deploy.sh   # 方案 B
+./deploy.sh                        # 默认：已存在 logicnet-mysql 容器时自动按方案 B 处理
+USE_INTERNAL_MYSQL=1 ./deploy.sh   # 显式指定方案 B（首次部署时用）
 ./rebuild.sh                       # 忽略构建缓存全量重建（镜像存在但内容未更新时使用）
 ```
 
@@ -97,13 +97,40 @@ mysql -h <主机> -u <账号> -p LogicNet < Sql/2026-11-02_P0_UserInfo唯一索�
 
 内置 MySQL 模式下：`docker compose -f docker-compose.yml -f docker-compose.mysql.yml exec mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" logicnet' < "Sql/2026-11-02_P0_UserInfo唯一索引.sql"`
 
-## 4. 升级
+## 4. 日常更新
+
+NAS 上 `~/logicnet` 是 **git archive 源码快照（无 `.git`）**：私有仓库凭据不在 NAS 上，因此由开发机推送更新。
 
 ```bash
-git pull                  # 或重新传输源码
-./deploy.sh               # 重新构建并滚动替换容器（构建完成 ≠ 部署完成，脚本内含 up -d）
-./rebuild.sh              # 构建缓存疑似命中旧代码时，忽略缓存全量重建
+# 在开发机仓库根目录，一条命令：同步 HEAD → 远端构建 → 滚动更新 → 健康检查
+scripts/update.sh
 ```
+
+等价的手工步骤（`scripts/update.sh` 内部就是这两步）：
+
+```bash
+git archive --format=tar HEAD | ssh quliting@192.168.2.104 "tar -xf - -C ~/logicnet"
+ssh quliting@192.168.2.104 "cd ~/logicnet && ./deploy.sh"
+```
+
+要点：
+
+- **只同步 git 跟踪文件**：NAS 上的 `.env`、`secrets.json`、`Logs/`、Docker 数据卷（MySQL 数据）都不会被覆盖。
+  因此 `.env` / `secrets.json` 不要提交进仓库；任一端修改配置都不会被更新流程抹掉。
+- `deploy.sh` 会自动识别已存在的 `logicnet-mysql` 容器并叠加 `docker-compose.mysql.yml`（方案 B），
+  日常更新无需再传 `USE_INTERNAL_MYSQL=1`。
+- 每次构建前旧镜像会打上 `logicnet:prev` 标签；`deploy.sh` 内含 `up -d` 与 `/health` 等待（最长 2 分钟）。
+
+**回滚**（在 NAS 上执行，回到上一个成功部署的镜像）：
+
+```bash
+docker tag logicnet:prev logicnet:latest
+docker compose -f docker-compose.yml -f docker-compose.mysql.yml up -d --force-recreate app
+curl -fsS http://127.0.0.1:8080/health
+```
+
+**注意**：解包是覆盖式，仓库中已删除的文件不会从 NAS 快照中消失；确需彻底对齐可在 NAS 上重建
+`~/logicnet`（先备份 `.env`、`secrets.json`，数据卷不受影响）。
 
 ## 5. 日志
 

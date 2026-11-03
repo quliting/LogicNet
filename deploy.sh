@@ -11,8 +11,15 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 FILES=(-f docker-compose.yml)
-if [ "${USE_INTERNAL_MYSQL:-0}" = "1" ]; then
+# 方案 B：显式指定 USE_INTERNAL_MYSQL=1，或检测到已存在的内置 mysql 容器（NAS 日常更新无需再传环境变量）
+if [ "${USE_INTERNAL_MYSQL:-0}" = "1" ] || docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx 'logicnet-mysql'; then
   FILES+=(-f docker-compose.mysql.yml)
+fi
+
+# 构建前把当前镜像备份为 logicnet:prev，供回滚使用（失败时见 DEPLOY.md「日常更新」）
+if docker image inspect logicnet:latest >/dev/null 2>&1; then
+  docker tag logicnet:latest logicnet:prev
+  echo "已备份当前镜像为 logicnet:prev"
 fi
 
 # 飞牛 NAS 的 BuildKit 构建沙箱内执行 apt-get / dotnet publish 会 SIGSEGV（exit 139），
@@ -29,6 +36,7 @@ fi
 docker compose "${FILES[@]}" build "${BUILD_ARGS[@]}"
 docker compose "${FILES[@]}" up -d
 docker compose "${FILES[@]}" ps
+echo "当前镜像：$(docker images logicnet:latest --format '{{.ID}}  {{.CreatedAt}}')"
 
 # 健康检查：等待 /health 返回 200（数据库连通性由应用内健康检查覆盖）
 PORT="$(docker compose "${FILES[@]}" port app 8080 2>/dev/null | awk -F: '{print $NF}')"
