@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Furion;
+using Furion.DataEncryption;
 using Furion.JsonSerialization;
 using Furion.Logging;
 using Furion.Schedule;
@@ -15,6 +16,7 @@ using LogicNet.Core;
 using LogicNet.Core.Entity;
 using LogicNet.Core.Security;
 using LogicNet.Web.Core.Job;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -233,6 +235,23 @@ public class Startup : AppStartup
         app.UseRateLimiter();
 
         app.UseAuthentication();
+
+        // 已登出/吊销的访问令牌按未认证处理：授权失败默认返回 403，前端无法据此判断需要重新登录，
+        // 这里在进入授权中间件前直接返回 401（匿名端点不处理）。
+        app.Use(async (context, next) =>
+        {
+            if (context is DefaultHttpContext httpContext
+                && httpContext.User.Identity?.IsAuthenticated == true
+                && httpContext.GetEndpoint()?.Metadata.GetMetadata<IAllowAnonymous>() == null
+                && TokenRevocationStore.IsRevoked(JWTEncryption.GetJwtBearerToken(httpContext)))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+
+            await next();
+        });
+
         app.UseAuthorization();
 
         app.UseInject(string.Empty);
