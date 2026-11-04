@@ -122,6 +122,18 @@ public static class AuditLogSanitizer
         return key is not null && SensitiveKeys.Contains(key, StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    ///     判断 SQL 参数名是否敏感：去掉 @/: /? 前缀后包含 password/pwd/token/code/secret 等关键词即视为敏感。
+    ///     用于在拼接参数列表前直接掩码参数值（如 @newPassword），比事后正则匹配更可靠。
+    /// </summary>
+    public static bool IsSensitiveName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+
+        var normalized = name.Trim().TrimStart('@', ':', '?');
+        return SensitiveKeys.Any(key => normalized.Contains(key, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static string MaskByRegex(string value)
     {
         var masked = JsonSecretRegex.Replace(value, "$1\"" + Mask + "\"");

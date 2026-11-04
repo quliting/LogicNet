@@ -174,6 +174,9 @@ public class Startup : AppStartup
         //注册SqlSugar
         services.AddScoped<ISqlSugarClient>(s =>
         {
+            // 审计 SQL 采集需要从当前请求的 HttpContext 取缓冲区；accessor 为单例，按 AsyncLocal 解析
+            var auditHttpContextAccessor = s.GetRequiredService<IHttpContextAccessor>();
+
             var sqlSugar = new SqlSugarScope(App.GetConfig<List<ConnectionConfig>>("ConnectionConfigs"),
                 db =>
                 {
@@ -184,9 +187,19 @@ public class Startup : AppStartup
                     {
                         //Sql 执行前
                     };
+                    db.Aop.OnLogExecuted = (sql, pars) =>
+                    {
+                        // 只写内存缓冲区，不访问数据库；耗时取 SqlSugar 记录的本次 SQL 执行时间。
+                        // 无 HttpContext（后台/定时任务）或请求已结束时由 AuditSqlCapture 直接跳过，
+                        // 不会把 SQL 误挂到其他请求的审计记录上。
+                        AuditSqlCapture.Capture(sql, pars, db.Ado.SqlExecutionTime, auditHttpContextAccessor);
+                    };
                     db.Aop.OnError = (exp) =>
                     {
-                        //Sql 执行出错
+                        // 执行失败的 SQL 不依赖慢阈值，必须留一条明细并带失败原因；
+                        // 同样只写内存缓冲区，且无 HttpContext 时自动跳过
+                        AuditSqlCapture.Capture(exp.Sql, exp.Parametres, db.Ado.SqlExecutionTime,
+                            auditHttpContextAccessor, exp.Message);
                     };
                     db.Aop.DataExecuting = (oldValue, entityInfo) =>
                     {
