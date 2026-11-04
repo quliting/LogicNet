@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using LogicNet.Application.Menu.DTO;
 using LogicNet.Core.Entity;
+using LogicNet.Core.Security;
 using Masuit.Tools;
 using Masuit.Tools.Models;
 using SqlSugar;
@@ -104,6 +106,64 @@ public class MenuService(ISqlSugarClient db) : LogicBase
             .OrderBy(x => x.Id, OrderByType.Asc);
 
         return await query.Select<MenuOutputDto>().PagedList(input.PageIndex, input.PageSize);
+    }
+
+    /// <summary>
+    ///     管理端菜单树：全部未删除菜单，children 嵌套，同级按 Sort 升序
+    /// </summary>
+    public async Task<List<MenuTreeOutputDto>> GetMenuTreeAsync()
+    {
+        var list = await db.Queryable<MenuEntity>().Select<MenuTreeOutputDto>().ToListAsync();
+        return BuildTree(list);
+    }
+
+    /// <summary>
+    ///     当前登录用户可访问的导航菜单树：仅已启用、侧栏可见，剔除按钮类型。
+    ///     父级不在结果集内时子级一并舍弃，避免禁用父级后出现孤立的顶级菜单。
+    /// </summary>
+    public async Task<List<MenuTreeOutputDto>> GetMyMenusAsync()
+    {
+        var userId = long.TryParse(App.HttpContext?.User?.FindFirstValue(JwtClaimNames.UserId), out var parsedUserId)
+            ? parsedUserId
+            : 0;
+
+        var query = db.Queryable<MenuEntity>()
+            .Where(x => x.IsEnabled)
+            .Where(x => x.IsVisible)
+            .Where(x => x.Type != MenuType.Button);
+
+        // 角色收窄的唯一入口，见 ApplyRoleFilter
+        query = ApplyRoleFilter(query, userId);
+
+        var list = await query.Select<MenuTreeOutputDto>().ToListAsync();
+        return BuildTree(list);
+    }
+
+    /// <summary>
+    ///     角色过滤扩展点：本轮未实现 RoleMenu 绑定，所有登录用户返回同一套启用菜单。
+    ///     后续接入角色时只改这里（按 userId Join 菜单角色关联表收窄），不要在各查询方法散落权限条件。
+    /// </summary>
+    private static ISugarQueryable<MenuEntity> ApplyRoleFilter(ISugarQueryable<MenuEntity> query, long userId)
+    {
+        return query;
+    }
+
+    /// <summary>
+    ///     按 ParentId 组装树：先按 Sort/Id 排序，再挂到父节点的 Children，同级顺序天然保持升序。
+    ///     仅 ParentId=0 作为根节点，父节点缺失的子节点不提升为根。
+    /// </summary>
+    private static List<MenuTreeOutputDto> BuildTree(IEnumerable<MenuTreeOutputDto> source)
+    {
+        var ordered = source.OrderBy(x => x.Sort).ThenBy(x => x.Id).ToList();
+        var byId = ordered.ToDictionary(x => x.Id);
+
+        foreach (var item in ordered)
+        {
+            if (item.ParentId == 0) continue;
+            if (byId.TryGetValue(item.ParentId, out var parent)) parent.Children.Add(item);
+        }
+
+        return ordered.Where(x => x.ParentId == 0).ToList();
     }
 
     private static void ValidateInput(AddMenuInputDto input)
