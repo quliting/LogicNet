@@ -10,6 +10,19 @@ public static class AuditLogCleanup
 {
     public static async Task<int> DeleteBeforeAsync(ISqlSugarClient db, DateTime cutoff)
     {
+        // 无外键级联：先按过期审计记录 Id 分块删除明细，再删除主记录，避免留下孤儿明细。
+        // 分块是为了避免单条 DELETE 的 IN 列表过长。
+        var expiredIds = await db.Queryable<AuditLog>()
+            .Where(x => x.CreateTime < cutoff)
+            .Select(x => x.Id)
+            .ToListAsync();
+
+        const int chunkSize = 1000;
+        foreach (var ids in expiredIds.Chunk(chunkSize))
+            await db.Deleteable<AuditSqlLog>()
+                .Where(x => ids.Contains(x.AuditLogId))
+                .ExecuteCommandAsync();
+
         return await db.Deleteable<AuditLog>()
             .Where(x => x.CreateTime < cutoff)
             .ExecuteCommandAsync();
