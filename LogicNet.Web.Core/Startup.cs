@@ -15,6 +15,7 @@ using Furion.Schedule;
 using LogicNet.Core;
 using LogicNet.Core.Entity;
 using LogicNet.Core.Security;
+using LogicNet.Web.Core.Audit;
 using LogicNet.Web.Core.Job;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -121,6 +122,11 @@ public class Startup : AppStartup
 
         // 临时文件清理：每分钟执行一次即可（10 分钟过期阈值不受触发频率影响），避免每秒扫盘的 IO 开销
         services.AddSchedule(item => { item.AddJob<DeleteDirJob>(TriggerBuilder.Period(60_000)); });
+
+        // 操作审计：配置可覆盖；请求线程只入队，后台服务批量落库，避免阻塞响应
+        services.Configure<AuditLogOptions>(App.Configuration.GetSection("AuditLog"));
+        services.AddSingleton<AuditLogQueue>();
+        services.AddHostedService<AuditLogWriterHostedService>();
 
         // 例子一：根据日志级别输出
         services.AddFileLogging("Logs/application-{0:yyyy}-{0:MM}-{0:dd}.log",
@@ -237,6 +243,11 @@ public class Startup : AppStartup
         app.UseRateLimiter();
 
         app.UseAuthentication();
+
+        // 操作审计：放在认证之后、授权/吊销检查之前。
+        // 认证后 User 已填充，能记录真实用户；授权拒绝（401/403）与吊销令牌的 401 也会经过本中间件，
+        // 保证未认证请求同样留痕。
+        app.UseMiddleware<AuditLogMiddleware>();
 
         // 已登出/吊销的访问令牌按未认证处理：授权失败默认返回 403，前端无法据此判断需要重新登录，
         // 这里在进入授权中间件前直接返回 401（匿名端点不处理）。

@@ -62,6 +62,20 @@
     "LowercaseRoute": false,
     "ModelToQuery": true
   },
+  // 操作审计：默认只记录写操作与登录类接口；GET 默认关闭，避免日志量放大
+  "AuditLog": {
+    "Enabled": true,
+    "IncludeGet": false,
+    "RecordLoginEndpoints": true,
+    "RecordRequestBody": true,
+    "MaxBodyLength": 2048,
+    "MaxQueryStringLength": 1024,
+    "MaxExceptionLength": 1024,
+    "SkipPaths": [ "/health", "/Api/AuditLog", "/swagger", "/api-docs" ],
+    "QueueCapacity": 10000,
+    "RetentionDays": 90,
+    "CleanupHour": 3
+  },
   // 验证码配置
   "CaptchaOptions": {
     "CaptchaType": 5,
