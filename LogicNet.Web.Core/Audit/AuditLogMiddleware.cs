@@ -115,6 +115,17 @@ public sealed class AuditLogMiddleware
 
         var statusCode = context.Response.StatusCode;
 
+        // 统一结果下业务失败仍是 HTTP 200，优先采用统一结果写入的业务码与成功状态
+        var resultCode = statusCode;
+        if (context.Items.TryGetValue(AuditLogContextKeys.ResultCode, out var resultCodeItem)
+            && resultCodeItem is int businessCode)
+            resultCode = businessCode;
+
+        var succeeded = statusCode < 400 && exception is null;
+        if (context.Items.TryGetValue(AuditLogContextKeys.Succeeded, out var succeededItem)
+            && succeededItem is bool businessSucceeded)
+            succeeded = businessSucceeded && exception is null;
+
         return new AuditLog
         {
             UserId = userId,
@@ -124,9 +135,8 @@ public sealed class AuditLogMiddleware
             QueryString = AuditLogSanitizer.SanitizeText(request.QueryString.Value, _options.MaxQueryStringLength),
             RequestBody = AuditLogSanitizer.SanitizeBody(requestBody, _options.MaxBodyLength),
             StatusCode = statusCode,
-            // 统一结果下业务失败仍是 HTTP 200，ResultCode 与状态码保持一致，由 Succeeded 区分业务结果
-            ResultCode = statusCode,
-            Succeeded = statusCode < 400 && exception is null,
+            ResultCode = resultCode,
+            Succeeded = succeeded,
             ClientIp = GetClientIp(context),
             UserAgent = AuditLogSanitizer.Truncate(request.Headers.UserAgent.ToString(), MaxUserAgentLength),
             TraceId = AuditLogSanitizer.Truncate(Activity.Current?.Id ?? context.TraceIdentifier, MaxTraceIdLength),

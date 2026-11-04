@@ -55,6 +55,16 @@ public class AuditLogServiceTests
     }
 
     [Fact]
+    public void 审计时间输出精确到秒()
+    {
+        var dto = new AuditLogOutputDto { CreatedAt = new DateTime(2026, 11, 4, 22, 30, 5) };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(dto);
+
+        Assert.Contains("2026-11-04 22:30:05", json);
+    }
+
+    [Fact]
     public async Task 支持时间区间_用户_路径_成功状态_方法过滤()
     {
         using var db = TestDb.Create();

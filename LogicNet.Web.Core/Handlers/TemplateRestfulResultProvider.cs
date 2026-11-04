@@ -7,6 +7,7 @@ using Furion.DataValidation;
 using Furion.FriendlyException;
 using Furion.Logging;
 using Furion.UnifyResult;
+using LogicNet.Web.Core.Audit;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -52,6 +53,7 @@ public class TemplateRestfulResultProvider : IUnifyResultProvider
         var statusCode = metadata.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden
             ? metadata.StatusCode
             : StatusCodes.Status401Unauthorized;
+        WriteAuditResult(context, statusCode, false);
         return new JsonResult(LogicRESTfulResult(statusCode, data: metadata.Data, errors: metadata.Errors),
             UnifyContext.GetSerializerSettings(context))
         {
@@ -70,6 +72,7 @@ public class TemplateRestfulResultProvider : IUnifyResultProvider
         // 错误日志携带请求上下文（请求 ID/方法/路径），与控制台、文件日志的 WithTraceId 输出同源，可互相检索
         Log.Error("请求处理异常，TraceId={TraceId}, Method={Method}, Path={Path}", context.Exception,
             App.GetTraceId(), context.HttpContext?.Request.Method, context.HttpContext?.Request.Path.Value);
+        WriteAuditResult(context.HttpContext, metadata.StatusCode, false);
         return new JsonResult(LogicRESTfulResult(metadata.StatusCode, data: metadata.Data, errors: metadata.Errors)
             , UnifyContext.GetSerializerSettings(context));
     }
@@ -82,6 +85,7 @@ public class TemplateRestfulResultProvider : IUnifyResultProvider
     /// <returns></returns>
     public IActionResult OnSucceeded(ActionExecutedContext context, object data)
     {
+        WriteAuditResult(context.HttpContext, StatusCodes.Status200OK, true);
         return new JsonResult(LogicRESTfulResult(StatusCodes.Status200OK, true, data)
             , UnifyContext.GetSerializerSettings(context));
     }
@@ -98,6 +102,7 @@ public class TemplateRestfulResultProvider : IUnifyResultProvider
     {
         // 设置响应状态码
         UnifyContext.SetResponseStatusCodes(context, statusCode, unifyResultSettings);
+        WriteAuditResult(context, statusCode, false);
         switch (statusCode)
         {
             // 处理 401 状态码
@@ -126,9 +131,22 @@ public class TemplateRestfulResultProvider : IUnifyResultProvider
         };
         Log.Error($"参数校验失败：{JsonSerializer.Serialize(errors)}");
 
-        return new JsonResult(LogicRESTfulResult(metadata.StatusCode ?? StatusCodes.Status400BadRequest,
+        var statusCode = metadata.StatusCode ?? StatusCodes.Status400BadRequest;
+        WriteAuditResult(context.HttpContext, statusCode, false);
+        return new JsonResult(LogicRESTfulResult(statusCode,
                 data: metadata.Data, errors: errors)
             , UnifyContext.GetSerializerSettings(context));
+    }
+
+    /// <summary>
+    ///     把业务结果码与成功状态写入 HttpContext.Items，供审计中间件采集；
+    ///     不改变原响应结构，未经过统一结果处理的请求仍回退到 HTTP 状态码。
+    /// </summary>
+    private static void WriteAuditResult(HttpContext context, int statusCode, bool succeeded)
+    {
+        if (context is null) return;
+        context.Items[AuditLogContextKeys.ResultCode] = statusCode;
+        context.Items[AuditLogContextKeys.Succeeded] = succeeded;
     }
 
     /// <summary>

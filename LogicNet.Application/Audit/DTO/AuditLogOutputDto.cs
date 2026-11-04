@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace LogicNet.Application.Audit.DTO;
 
 /// <summary>
@@ -34,7 +36,8 @@ public class AuditLogOutputDto
     public string ExceptionMessage { get; set; }
 
     /// <summary>
-    ///     创建时间（对应实体 CreateTime）
+    ///     创建时间（对应实体 CreateTime，精确到秒）
     /// </summary>
+    [JsonConverter(typeof(AuditLogDateTimeConverter))]
     public DateTime CreatedAt { get; set; }
 }

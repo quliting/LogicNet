@@ -171,6 +171,28 @@ public class AuditLogMiddlewareTests
     }
 
     [Fact]
+    public async Task 优先采用统一结果写入的业务码与成功状态()
+    {
+        var options = new AuditLogOptions();
+        var queue = CreateQueue(options);
+        var middleware = CreateMiddleware(context =>
+        {
+            // 模拟统一结果：HTTP 200 但业务失败
+            context.Items[AuditLogContextKeys.ResultCode] = 400;
+            context.Items[AuditLogContextKeys.Succeeded] = false;
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            return Task.CompletedTask;
+        }, queue, options);
+
+        await middleware.InvokeAsync(CreateContext("POST", "/Api/Menu/CreateMenu", "{\"a\":1}"));
+
+        Assert.True(queue.TryDequeue(out var log));
+        Assert.Equal(200, log.StatusCode);
+        Assert.Equal(400, log.ResultCode);
+        Assert.False(log.Succeeded);
+    }
+
+    [Fact]
     public async Task 下游异常会记录失败并原样抛出()
     {
         var options = new AuditLogOptions();
