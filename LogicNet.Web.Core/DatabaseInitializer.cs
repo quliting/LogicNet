@@ -20,7 +20,8 @@ public static class DatabaseInitializer
     public static void Initialize(ISqlSugarClient db)
     {
         // CodeFirst 建表：新环境自动创建表结构与 SugarIndex 声明的索引
-        db.CodeFirst.InitTables(typeof(UserInfo), typeof(Role), typeof(UserRole), typeof(Menu));
+        db.CodeFirst.InitTables(typeof(UserInfo), typeof(Role), typeof(UserRole), typeof(Menu),
+            typeof(AuditLog));
 
         // 幂等角色种子：仅插入库中尚不存在的角色，可重复执行
         var existingNames = db.Queryable<Role>().Select(x => x.Name).ToList();
