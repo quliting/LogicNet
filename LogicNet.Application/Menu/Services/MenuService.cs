@@ -5,6 +5,7 @@ using LogicNet.Core.Security;
 using Masuit.Tools;
 using Masuit.Tools.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using SqlSugar;
 using MenuEntity = LogicNet.Core.Entity.Menu;
 
@@ -14,9 +15,10 @@ namespace LogicNet.Application.Menu.Services;
 ///     菜单维护：新增/编辑/删除（软删除）/详情/列表。
 ///     树查询与当前用户动态加载见 GetMenuTreeAsync / GetMyMenusAsync。
 /// </summary>
-public class MenuService(ISqlSugarClient db) : LogicBase
+public class MenuService(ISqlSugarClient db, IHttpContextAccessor httpContextAccessor) : LogicBase
 {
     private readonly ISqlSugarClient db = db;
+    private readonly IHttpContextAccessor httpContextAccessor = httpContextAccessor;
 
     /// <summary>
     ///     新增菜单：校验上级存在且不成环，同一上级下路由路径唯一（仅 Admin）
@@ -130,7 +132,8 @@ public class MenuService(ISqlSugarClient db) : LogicBase
     /// </summary>
     public async Task<List<MenuTreeOutputDto>> GetMyMenusAsync()
     {
-        var userId = long.TryParse(App.HttpContext?.User?.FindFirstValue(JwtClaimNames.UserId), out var parsedUserId)
+        var userId = long.TryParse(httpContextAccessor.HttpContext?.User?.FindFirstValue(JwtClaimNames.UserId),
+            out var parsedUserId)
             ? parsedUserId
             : 0;
 
