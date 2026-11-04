@@ -38,6 +38,26 @@ public class AuditLogPersisterTests
     }
 
     [Fact]
+    public async Task 未指定Id时自动生成唯一雪花Id()
+    {
+        using var db = TestDb.Create();
+        db.CodeFirst.InitTables(typeof(AuditLog));
+
+        var logs = new[]
+        {
+            new AuditLog { HttpMethod = "POST", Path = "/a", StatusCode = 200 },
+            new AuditLog { HttpMethod = "POST", Path = "/b", StatusCode = 200 }
+        };
+
+        var result = await AuditLogPersister.PersistAsync(db, logs);
+
+        Assert.True(result);
+        var saved = db.Queryable<AuditLog>().ToList();
+        Assert.Equal(2, saved.Count);
+        Assert.All(saved, x => Assert.True(x.Id > 0));
+    }
+
+    [Fact]
     public async Task 数据库不可用时写入失败但不抛出()
     {
         using var db = new SqlSugarScope(new ConnectionConfig

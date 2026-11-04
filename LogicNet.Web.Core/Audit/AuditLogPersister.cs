@@ -24,6 +24,13 @@ public static class AuditLogPersister
         try
         {
             EnsureTable(db);
+
+            // BaseEntity.Id 非自增列，批量插入前必须补齐雪花 Id，
+            // 否则多条记录都以 0 写入会触发主键冲突并整批丢失。
+            foreach (var log in logs)
+                if (log.Id == 0)
+                    log.Id = SnowFlakeSingle.Instance.NextId();
+
             await db.Insertable(logs.ToList()).ExecuteCommandAsync();
             return true;
         }
