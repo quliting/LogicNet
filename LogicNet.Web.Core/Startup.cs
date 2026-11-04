@@ -127,6 +127,8 @@ public class Startup : AppStartup
         services.Configure<AuditLogOptions>(App.Configuration.GetSection("AuditLog"));
         services.AddSingleton<AuditLogQueue>();
         services.AddHostedService<AuditLogWriterHostedService>();
+        // 每日清理过期审计日志（独立于 60 秒周期的临时文件清理任务）
+        services.AddHostedService<AuditLogCleanupHostedService>();
 
         // 例子一：根据日志级别输出
         services.AddFileLogging("Logs/application-{0:yyyy}-{0:MM}-{0:dd}.log",
