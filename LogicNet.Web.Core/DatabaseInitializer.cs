@@ -20,7 +20,7 @@ public static class DatabaseInitializer
     public static void Initialize(ISqlSugarClient db)
     {
         // CodeFirst 建表：新环境自动创建表结构与 SugarIndex 声明的索引
-        db.CodeFirst.InitTables(typeof(UserInfo), typeof(Role), typeof(UserRole));
+        db.CodeFirst.InitTables(typeof(UserInfo), typeof(Role), typeof(UserRole), typeof(Menu));
 
         // 幂等角色种子：仅插入库中尚不存在的角色，可重复执行
         var existingNames = db.Queryable<Role>().Select(x => x.Name).ToList();
@@ -29,5 +29,53 @@ public static class DatabaseInitializer
             .ToList();
         if (newRoles.Count > 0)
             db.Insertable(newRoles).ExecuteReturnSnowflakeIdList();
+
+        SeedMenus(db);
+    }
+
+    /// <summary>
+    ///     最小菜单种子：系统管理（目录）→ 菜单管理（菜单），可重复执行。
+    ///     已软删除的种子菜单不会被重新插入，避免重启覆盖管理员删除意图。
+    /// </summary>
+    private static void SeedMenus(ISqlSugarClient db)
+    {
+        // ClearFilter 让软删除行参与存在性判断（默认全局过滤器会把它们隐藏）
+        var system = db.Queryable<Menu>().ClearFilter()
+            .Where(x => x.ParentId == 0 && x.Path == "/system")
+            .First();
+        if (system is { IsDelete: true }) return;
+        if (system is null)
+        {
+            system = new Menu
+            {
+                ParentId = 0,
+                Name = "系统管理",
+                Path = "/system",
+                Icon = "setting",
+                Sort = 1,
+                Type = MenuType.Directory,
+                IsEnabled = true,
+                IsVisible = true
+            };
+            system.Id = db.Insertable(system).ExecuteReturnSnowflakeId();
+        }
+
+        var menuManagement = db.Queryable<Menu>().ClearFilter()
+            .Where(x => x.ParentId == system.Id && x.Path == "/system/menu")
+            .First();
+        if (menuManagement is null)
+            db.Insertable(new Menu
+            {
+                ParentId = system.Id,
+                Name = "菜单管理",
+                Path = "/system/menu",
+                Component = "system/menu/index",
+                Icon = "menu",
+                Sort = 1,
+                Type = MenuType.Menu,
+                PermissionCode = "system:menu:list",
+                IsEnabled = true,
+                IsVisible = true
+            }).ExecuteReturnSnowflakeId();
     }
 }
