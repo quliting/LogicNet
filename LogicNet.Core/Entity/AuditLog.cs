@@ -57,13 +57,15 @@ public class AuditLog : BaseEntity
     public int StatusCode { get; set; }
 
     /// <summary>
-    ///     业务结果码：当前与 StatusCode 一致（统一结果下业务失败仍为 200，需结合 Succeeded 判断）
+    ///     业务结果码：优先取统一结果的业务码（业务失败可能 HTTP 200 但 ResultCode 为 4xx），
+    ///     未经过统一结果处理时与 StatusCode 一致
     /// </summary>
     [SugarColumn(IsNullable = true)]
     public int? ResultCode { get; set; }
 
     /// <summary>
-    ///     请求是否成功（状态码小于 400 且未抛出异常）
+    ///     请求是否成功：优先取统一结果的业务成功状态；未经过统一结果时为
+    ///     “状态码小于 400 且未抛出异常”
     /// </summary>
     public bool Succeeded { get; set; }
 
