@@ -99,10 +99,10 @@ public class Startup : AppStartup
         IdGeneratorSetup.Configure(workerId);
         // SqlSugar 的雪花 Id 入口统一委托给 Yitter，业务插入无需手工赋值
         StaticConfig.CustomSnowFlakeFunc = YitIdHelper.NextId;
-        Log.Information("雪花 Id 初始化：WorkerId={WorkerId}（来源：{Source}），BaseTime={BaseTime:yyyy-MM-dd}，" +
-                 "WorkerIdBitLength={WorkerBits}，SeqBitLength={SeqBits}",
-            workerId, workerIdSource, IdGeneratorSetup.BaseTime,
-            IdGeneratorSetup.WorkerIdBitLength, IdGeneratorSetup.SeqBitLength);
+        Log.Information($"雪花 Id 初始化：WorkerId={workerId}（来源：{workerIdSource}），" +
+                        $"BaseTime={IdGeneratorSetup.BaseTime:yyyy-MM-dd}，" +
+                        $"WorkerIdBitLength={IdGeneratorSetup.WorkerIdBitLength}，" +
+                        $"SeqBitLength={IdGeneratorSetup.SeqBitLength}");
 
         services.AddCaptcha(App.Configuration);
 
