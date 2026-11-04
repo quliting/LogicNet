@@ -18,6 +18,7 @@ Furion 动态 API，路由前缀 `/Api/Menu`。请求体为 JSON；单参数接�
 | GET | `/Api/Menu/GetMyMenus` | 登录 | 当前用户导航树（已启用 + 侧栏可见 + 非按钮） |
 
 > 实际 HTTP 谓词以 Furion 动态 API 生成结果为准；若框架按动作名前缀推断不一致，以服务端路由为准。
+> 统一结果下业务失败（如删除被拒）HTTP 状态仍为 200，需读取响应体 `Code`/`Succeeded`；鉴权失败才是 HTTP 401/403。
 
 ## 字段约定
 
@@ -30,7 +31,7 @@ Furion 动态 API，路由前缀 `/Api/Menu`。请求体为 JSON；单参数接�
 | `Component` | string? | 前端组件标识，目录可为空 |
 | `Icon` | string? | 图标标识 |
 | `Sort` | int | 同级升序 |
-| `Type` | int/enum | `1=Directory`、`2=Menu`、`3=Button` |
+| `Type` | string/int | 序列化为 `"Directory"`/`"Menu"`/`"Button"`；入参也接受 `1/2/3` |
 | `PermissionCode` | string? | 按钮级权限标识 |
 | `IsEnabled` | bool | 是否启用 |
 | `IsVisible` | bool | 是否在侧栏显示 |
