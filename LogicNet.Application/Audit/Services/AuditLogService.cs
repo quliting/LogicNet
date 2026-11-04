@@ -75,6 +75,9 @@ public class AuditLogService(ISqlSugarClient db) : LogicBase
                 TraceId = x.TraceId,
                 DurationMs = x.DurationMs,
                 ExceptionMessage = x.ExceptionMessage,
+                SqlCount = x.SqlCount,
+                SqlElapsedMs = x.SqlElapsedMs,
+                SlowSqlCount = x.SlowSqlCount,
                 CreatedAt = x.CreateTime
             })
             .PagedList(input.PageIndex, input.PageSize);
@@ -107,13 +110,82 @@ public class AuditLogService(ISqlSugarClient db) : LogicBase
                 TraceId = x.TraceId,
                 DurationMs = x.DurationMs,
                 ExceptionMessage = x.ExceptionMessage,
+                SqlCount = x.SqlCount,
+                SqlElapsedMs = x.SqlElapsedMs,
+                SlowSqlCount = x.SlowSqlCount,
                 CreatedAt = x.CreateTime
             })
             .FirstAsync();
 
         if (result is null) throw Oops.Bah("审计日志不存在");
 
+        // 明细按主键升序返回，与 SQL 实际执行顺序一致
+        result.SqlLogs = await db.Queryable<AuditSqlLog>()
+            .Where(x => x.AuditLogId == id)
+            .OrderBy(x => x.Id)
+            .Select<AuditSqlLogOutputDto>(x => new AuditSqlLogOutputDto
+            {
+                Id = x.Id,
+                AuditLogId = x.AuditLogId,
+                TraceId = x.TraceId,
+                SqlText = x.SqlText,
+                Parameters = x.Parameters,
+                ElapsedMs = x.ElapsedMs,
+                IsSlow = x.IsSlow,
+                ErrorMessage = x.ErrorMessage,
+                CreatedAt = x.CreateTime
+            })
+            .ToListAsync();
+
         return result;
+    }
+
+    /// <summary>
+    ///     慢 SQL 列表：按时间区间与最小耗时过滤，附带所属请求的路径与操作人（仅 Admin）
+    /// </summary>
+    [Authorize(Roles = "Admin")]
+    public async Task<PagedList<SlowSqlOutputDto>> GetSlowSqlListAsync(GetSlowSqlListInputDto input)
+    {
+        // 与采集默认慢阈值保持一致；显式传 0 时可查看全部明细
+        var minElapsedMs = Math.Max(0, input.MinElapsedMs ?? 200);
+
+        var query = db.Queryable<AuditSqlLog>()
+            .LeftJoin<AuditLog>((sql, log) => sql.AuditLogId == log.Id);
+
+        // 时间条件用显式分支，避免多表 WhereIF 的可空表达式在 ORM 中被忽略
+        if (input.StartTime.HasValue)
+        {
+            var startTime = input.StartTime.Value;
+            query = query.Where((sql, log) => sql.CreateTime >= startTime);
+        }
+
+        if (input.EndTime.HasValue)
+        {
+            var endTime = input.EndTime.Value;
+            query = query.Where((sql, log) => sql.CreateTime <= endTime);
+        }
+
+        query = query.Where((sql, log) => sql.ElapsedMs >= minElapsedMs);
+
+        return await query
+            .OrderByDescending((sql, log) => sql.ElapsedMs)
+            .OrderByDescending((sql, log) => sql.Id)
+            .Select((sql, log) => new SlowSqlOutputDto
+            {
+                Id = sql.Id,
+                AuditLogId = sql.AuditLogId,
+                TraceId = sql.TraceId,
+                SqlText = sql.SqlText,
+                Parameters = sql.Parameters,
+                ElapsedMs = sql.ElapsedMs,
+                IsSlow = sql.IsSlow,
+                ErrorMessage = sql.ErrorMessage,
+                CreatedAt = sql.CreateTime,
+                UserName = log.UserName,
+                Path = log.Path,
+                HttpMethod = log.HttpMethod
+            })
+            .PagedList(input.PageIndex, input.PageSize);
     }
 
     /// <summary>

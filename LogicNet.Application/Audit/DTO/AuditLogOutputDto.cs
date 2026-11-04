@@ -36,6 +36,21 @@ public class AuditLogOutputDto
     public string ExceptionMessage { get; set; }
 
     /// <summary>
+    ///     本次请求执行的 SQL 条数
+    /// </summary>
+    public int SqlCount { get; set; }
+
+    /// <summary>
+    ///     本次请求 SQL 净耗时合计（毫秒）
+    /// </summary>
+    public long SqlElapsedMs { get; set; }
+
+    /// <summary>
+    ///     超过慢阈值的 SQL 条数
+    /// </summary>
+    public int SlowSqlCount { get; set; }
+
+    /// <summary>
     ///     创建时间（对应实体 CreateTime，精确到秒）
     /// </summary>
     [JsonConverter(typeof(AuditLogDateTimeConverter))]
