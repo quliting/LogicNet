@@ -21,13 +21,26 @@ public static class AuditLogSanitizer
 
     private const string TruncatedSuffix = "...(truncated)";
 
-    // 敏感键名按完整键匹配（忽略大小写），避免误伤 PermissionCode 之类的业务字段
+    // 完整键名（忽略大小写）直接命中：常见凭据键 + 验证码语义键（code/verifyCode/captchaCode 等）。
+    // 刻意不把 "code" 做成片段匹配，避免 permissionCode/roleCode/orderCode 等业务编码被误伤
     private static readonly string[] SensitiveKeys =
     {
-        "password", "accesstoken", "refreshtoken", "authorization", "code", "token", "pwd", "secret"
+        "password", "passwd", "pwd", "accesstoken", "refreshtoken", "authorization", "secret", "token",
+        "verificationcode", "captchacode", "verifycode", "mobilecode", "emailcode", "smscode", "otpcode",
+        "code"
     };
 
-    private static readonly string KeyPattern = string.Join("|", SensitiveKeys);
+    // 键名/参数名包含这些片段即视为敏感，覆盖 newPassword、userToken 等变体；
+    // 同样不包含 "code"，保证 permissionCode、roleCode 等业务编码保留原值
+    private static readonly string[] SensitiveNameFragments =
+    {
+        "password", "passwd", "pwd", "accesstoken", "refreshtoken", "authorization", "secret", "token",
+        "verificationcode", "captchacode", "verifycode", "mobilecode", "emailcode", "smscode", "otpcode"
+    };
+
+    // 正则按长度倒序排列，确保 verificationcode 优先于 code 命中
+    private static readonly string KeyPattern = string.Join("|",
+        SensitiveKeys.OrderByDescending(key => key.Length).Select(Regex.Escape));
 
     // JSON 形式的 "key": "value" 或 "key": 123
     private static readonly Regex JsonSecretRegex = new(
@@ -119,19 +132,30 @@ public static class AuditLogSanitizer
 
     private static bool IsSensitiveKey(string key)
     {
-        return key is not null && SensitiveKeys.Contains(key, StringComparer.OrdinalIgnoreCase);
+        return IsSensitiveToken(key);
     }
 
     /// <summary>
-    ///     判断 SQL 参数名是否敏感：去掉 @/: /? 前缀后包含 password/pwd/token/code/secret 等关键词即视为敏感。
-    ///     用于在拼接参数列表前直接掩码参数值（如 @newPassword），比事后正则匹配更可靠。
+    ///     判断 SQL 参数名是否敏感：去掉 @/: /? 前缀后按完整名或敏感片段匹配。
+    ///     code/verifyCode/captchaCode 等验证码键会被掩码，permissionCode/roleCode/orderCode
+    ///     等业务编码保留原值。用于在拼接参数列表前直接掩码参数值（如 @newPassword），比事后正则匹配更可靠。
     /// </summary>
     public static bool IsSensitiveName(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return false;
 
-        var normalized = name.Trim().TrimStart('@', ':', '?');
-        return SensitiveKeys.Any(key => normalized.Contains(key, StringComparison.OrdinalIgnoreCase));
+        return IsSensitiveToken(name.Trim().TrimStart('@', ':', '?'));
+    }
+
+    private static bool IsSensitiveToken(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+
+        // 忽略下划线等分隔符，兼容 verify_code / permission_code 之类的命名风格
+        var normalized = name.Trim().Replace("_", string.Empty);
+        return SensitiveKeys.Contains(normalized, StringComparer.OrdinalIgnoreCase)
+               || SensitiveNameFragments.Any(fragment =>
+                   normalized.Contains(fragment, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string MaskByRegex(string value)

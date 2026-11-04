@@ -19,9 +19,18 @@ public class AuditSqlOptions
     public bool RecordAll { get; set; } = false;
 
     /// <summary>
-    ///     慢 SQL 阈值（毫秒）：达到或超过该值的语句标记为慢 SQL 并写入明细（不限请求方法）
+    ///     慢 SQL 阈值（毫秒）：达到或超过该值的语句标记为慢 SQL 并写入明细（不限请求方法）。
+    ///     默认 500ms：NAS 上常规写菜单约 220-300ms，200ms 会产生大量无意义慢 SQL 噪音；
+    ///     排查时可临时调低（如 100ms），改完即可观察命中情况
     /// </summary>
-    public int SlowThresholdMs { get; set; } = 200;
+    public int SlowThresholdMs { get; set; } = 500;
+
+    /// <summary>
+    ///     慢 GET 入审计（默认开启）：GET 请求本身不生成审计主记录（除非 IncludeGet=true），
+    ///     但当请求内出现达到慢阈值的 SQL 时，单独生成一条审计记录以便追溯慢查询。
+    ///     false 时保持旧行为：GET 完全不记录。仅在 Sql.Enabled=true 时生效
+    /// </summary>
+    public bool AuditSlowGet { get; set; } = true;
 
     /// <summary>
     ///     单条 SQL 文本最大长度（字符），超出截断

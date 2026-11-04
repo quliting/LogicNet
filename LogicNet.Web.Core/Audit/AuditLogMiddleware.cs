@@ -58,13 +58,16 @@ public sealed class AuditLogMiddleware
         }
 
         var shouldRecord = ShouldRecord(context.Request);
+        var slowGetTracking = !shouldRecord && IsGetRequest(context.Request) && _options.Sql.AuditSlowGet;
 
-        // SQL 明细采集：只对会被审计的请求开启，缓冲区挂在 HttpContext.Items 上，
-        // 与请求一一对应，保证同一请求的 SQL 不会串到其他审计记录
+        // SQL 明细采集：对会被审计的请求开启；另外默认对未审计的 GET 做“慢 SQL 探测”，
+        // 命中慢阈值时补一条审计记录。缓冲区挂在 HttpContext.Items 上，与请求一一对应，
+        // 保证同一请求的 SQL 不会串到其他审计记录
         AuditSqlCollector sqlCollector = null;
-        if (shouldRecord && _options.Sql.Enabled)
+        if (_options.Sql.Enabled && (shouldRecord || slowGetTracking))
         {
-            sqlCollector = new AuditSqlCollector(_options.Sql);
+            // 探测型 GET 只保留慢 SQL/失败 SQL，避免 RecordAll 打开时为不落库的请求全量格式化
+            sqlCollector = new AuditSqlCollector(_options.Sql, forceSlowOnly: !shouldRecord);
             context.Items[AuditLogContextKeys.SqlCollector] = sqlCollector;
         }
 
@@ -111,7 +114,12 @@ public sealed class AuditLogMiddleware
                 }
             }
 
-            if (shouldRecord)
+            // 默认不审计的 GET 仅在出现慢 SQL 时才补一条审计记录（开关 AuditSlowGet）；
+            // 成功状态仍按请求实际结果记录，便于从慢 SQL 反查具体接口与操作人
+            var shouldWrite = shouldRecord
+                              || (slowGetTracking && sqlSnapshot is { SlowCount: > 0 });
+
+            if (shouldWrite)
             {
                 try
                 {
@@ -221,6 +229,11 @@ public sealed class AuditLogMiddleware
         }
 
         return false;
+    }
+
+    private static bool IsGetRequest(HttpRequest request)
+    {
+        return HttpMethods.IsGet(request.Method);
     }
 
     private bool ShouldRecord(HttpRequest request)

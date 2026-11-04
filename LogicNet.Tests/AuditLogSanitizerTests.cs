@@ -83,6 +83,36 @@ public class AuditLogSanitizerTests
         Assert.Contains("password=***", result);
     }
 
+    [Theory]
+    [InlineData("@code", true)]
+    [InlineData("@verifyCode", true)]
+    [InlineData("@verificationCode", true)]
+    [InlineData("@captchaCode", true)]
+    [InlineData("@sms_code", true)]
+    [InlineData("@newPassword", true)]
+    [InlineData("@accessToken", true)]
+    [InlineData("@permissionCode", false)]
+    [InlineData("@roleCode", false)]
+    [InlineData("@orderCode", false)]
+    [InlineData("@userId", false)]
+    public void 参数名按验证码语义掩码_业务编码保留(string name, bool sensitive)
+    {
+        Assert.Equal(sensitive, AuditLogSanitizer.IsSensitiveName(name));
+    }
+
+    [Fact]
+    public void JSON请求体中的业务编码保留_验证码被掩码()
+    {
+        var body = "{\"permissionCode\":\"menu:list\",\"roleCode\":\"ops\",\"verifyCode\":\"9527\"}";
+
+        var result = AuditLogSanitizer.SanitizeBody(body, 2048);
+
+        Assert.Contains("menu:list", result);
+        Assert.Contains("ops", result);
+        Assert.DoesNotContain("9527", result);
+        Assert.Contains("\"verifyCode\":\"***\"", result);
+    }
+
     [Fact]
     public void 超长内容按上限截断并带标记()
     {

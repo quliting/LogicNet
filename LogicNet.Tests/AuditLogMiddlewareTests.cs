@@ -218,7 +218,7 @@ public class AuditLogMiddlewareTests
         {
             var collector = (AuditSqlCollector)context.Items[AuditLogContextKeys.SqlCollector];
             collector.Add("SELECT fast", null, 10);
-            collector.Add("SELECT slow", null, 300);
+            collector.Add("SELECT slow", null, 600);
             context.Response.StatusCode = StatusCodes.Status200OK;
             return Task.CompletedTask;
         }, queue, options);
@@ -227,7 +227,7 @@ public class AuditLogMiddlewareTests
 
         Assert.True(queue.TryDequeue(out var log));
         Assert.Equal(2, log.SqlCount);
-        Assert.Equal(310, log.SqlElapsedMs);
+        Assert.Equal(610, log.SqlElapsedMs);
         Assert.Equal(1, log.SlowSqlCount);
         Assert.Single(log.SqlLogs);
         Assert.Equal("SELECT slow", log.SqlLogs[0].SqlText);
@@ -258,6 +258,62 @@ public class AuditLogMiddlewareTests
         Assert.Contains("***", log.SqlLogs[0].Parameters);
         Assert.DoesNotContain("abc123", log.SqlLogs[0].ErrorMessage);
         Assert.Contains("***", log.SqlLogs[0].ErrorMessage);
+    }
+
+    [Fact]
+    public async Task GET无慢SQL时不生成审计记录_有慢SQL时补一条()
+    {
+        var options = new AuditLogOptions();
+        var queue = CreateQueue(options);
+        var middleware = CreateMiddleware(context =>
+        {
+            var collector = (AuditSqlCollector)context.Items[AuditLogContextKeys.SqlCollector];
+            collector.Add("SELECT fast", null, 10);
+            collector.Add("SELECT slow", null, 600);
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            return Task.CompletedTask;
+        }, queue, options);
+
+        await middleware.InvokeAsync(CreateContext("GET", "/Api/Menu/GetMenuList"));
+
+        Assert.True(queue.TryDequeue(out var log));
+        Assert.Equal("GET", log.HttpMethod);
+        Assert.True(log.Succeeded);
+        Assert.Equal(2, log.SqlCount);
+        Assert.Equal(1, log.SlowSqlCount);
+        Assert.Single(log.SqlLogs);
+        Assert.Equal("SELECT slow", log.SqlLogs[0].SqlText);
+
+        // 只有快 SQL 的 GET 不应产生审计记录
+        var fastQueue = CreateQueue(options);
+        var fastMiddleware = CreateMiddleware(context =>
+        {
+            var collector = (AuditSqlCollector)context.Items[AuditLogContextKeys.SqlCollector];
+            collector.Add("SELECT fast", null, 10);
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            return Task.CompletedTask;
+        }, fastQueue, options);
+
+        await fastMiddleware.InvokeAsync(CreateContext("GET", "/Api/Menu/GetMenuList"));
+        Assert.False(fastQueue.TryDequeue(out _));
+    }
+
+    [Fact]
+    public async Task 关闭AuditSlowGet后慢GET也不记录()
+    {
+        var options = new AuditLogOptions { Sql = new AuditSqlOptions { AuditSlowGet = false } };
+        var queue = CreateQueue(options);
+        var middleware = CreateMiddleware(context =>
+        {
+            // 关闭后不应为 GET 创建采集缓冲区
+            Assert.False(context.Items.ContainsKey(AuditLogContextKeys.SqlCollector));
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            return Task.CompletedTask;
+        }, queue, options);
+
+        await middleware.InvokeAsync(CreateContext("GET", "/Api/Menu/GetMenuList"));
+
+        Assert.False(queue.TryDequeue(out _));
     }
 
     [Fact]

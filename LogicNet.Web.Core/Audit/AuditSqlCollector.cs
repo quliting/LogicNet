@@ -74,10 +74,18 @@ public sealed class AuditSqlCollector
     private int _droppedCount;
     private bool _closed;
 
-    public AuditSqlCollector(AuditSqlOptions options)
+    public AuditSqlCollector(AuditSqlOptions options) : this(options, false)
+    {
+    }
+
+    /// <summary>
+    ///     forceSlowOnly：仅保留慢 SQL/失败 SQL 明细（忽略 RecordAll）。用于“慢 GET 探测”——
+    ///     这类请求默认不落审计主记录，没必要为它们全量格式化每条 SQL
+    /// </summary>
+    public AuditSqlCollector(AuditSqlOptions options, bool forceSlowOnly)
     {
         options ??= new AuditSqlOptions();
-        _recordAll = options.RecordAll;
+        _recordAll = options.RecordAll && !forceSlowOnly;
         _slowThresholdMs = Math.Clamp(options.SlowThresholdMs, 0, 60000);
         _maxSqlLength = Math.Clamp(options.MaxSqlLength, 100, 10000);
         _maxParametersLength = Math.Clamp(options.MaxParametersLength, 100, 10000);

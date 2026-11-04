@@ -22,12 +22,12 @@ public class AuditSqlCollectorTests
         var collector = new AuditSqlCollector(new AuditSqlOptions { RecordAll = true });
 
         collector.Add("INSERT INTO Menu(Name) VALUES(@name)", Params(("@name", "菜单")), 3);
-        collector.Add("SELECT * FROM Menu", null, 260);
+        collector.Add("SELECT * FROM Menu", null, 600);
 
         var snapshot = collector.Close();
 
         Assert.Equal(2, snapshot.Count);
-        Assert.Equal(263, snapshot.ElapsedMs);
+        Assert.Equal(603, snapshot.ElapsedMs);
         Assert.Equal(1, snapshot.SlowCount);
         Assert.Equal(2, snapshot.Items.Count);
         Assert.True(snapshot.Items[1].IsSlow);
@@ -48,6 +48,39 @@ public class AuditSqlCollectorTests
         Assert.Equal(1, snapshot.SlowCount);
         Assert.Single(snapshot.Items);
         Assert.Equal(200, snapshot.Items[0].ElapsedMs);
+    }
+
+    [Fact]
+    public void 默认阈值为500毫秒_300毫秒不记为慢SQL()
+    {
+        var collector = new AuditSqlCollector(new AuditSqlOptions());
+
+        collector.Add("SELECT 1", null, 300);
+        collector.Add("SELECT 2", null, 500);
+
+        var snapshot = collector.Close();
+
+        Assert.Equal(2, snapshot.Count);
+        Assert.Equal(1, snapshot.SlowCount);
+        Assert.Single(snapshot.Items);
+        Assert.Equal(500, snapshot.Items[0].ElapsedMs);
+    }
+
+    [Fact]
+    public void 业务编码参数不被掩码_验证码参数被掩码()
+    {
+        var collector = new AuditSqlCollector(new AuditSqlOptions { RecordAll = true });
+        collector.Add(
+            "INSERT INTO Menu(PermissionCode) VALUES(@permissionCode)",
+            Params(("@permissionCode", "menu:list"), ("@roleCode", "ops"), ("@code", "9527")),
+            1);
+
+        var parameters = collector.Close().Items[0].Parameters;
+
+        Assert.Contains("@permissionCode=\"menu:list\"", parameters);
+        Assert.Contains("@roleCode=\"ops\"", parameters);
+        Assert.Contains("@code=***", parameters);
+        Assert.DoesNotContain("9527", parameters);
     }
 
     [Fact]
@@ -154,10 +187,10 @@ public class AuditSqlCollectorTests
         context2.Items[AuditLogContextKeys.SqlCollector] = new AuditSqlCollector(new AuditSqlOptions());
 
         accessor.HttpContext = context1;
-        AuditSqlCapture.Capture("SELECT a", null, TimeSpan.FromMilliseconds(300), accessor);
+        AuditSqlCapture.Capture("SELECT a", null, TimeSpan.FromMilliseconds(600), accessor);
 
         accessor.HttpContext = context2;
-        AuditSqlCapture.Capture("SELECT b", null, TimeSpan.FromMilliseconds(300), accessor);
+        AuditSqlCapture.Capture("SELECT b", null, TimeSpan.FromMilliseconds(600), accessor);
 
         var first = ((AuditSqlCollector)context1.Items[AuditLogContextKeys.SqlCollector]).Close();
         var second = ((AuditSqlCollector)context2.Items[AuditLogContextKeys.SqlCollector]).Close();

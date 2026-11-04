@@ -16,7 +16,7 @@ public class GetSlowSqlListInputDto : BaseInput
     public DateTime? EndTime { get; set; }
 
     /// <summary>
-    ///     最小耗时（毫秒，含）；未传时默认 200，与采集默认慢阈值一致
+    ///     最小耗时（毫秒，含）；未传时默认 200（查询侧兜底，可显式传 0 查看全部明细）
     /// </summary>
     public long? MinElapsedMs { get; set; }
 }
