@@ -33,6 +33,11 @@
     "Host": "https://localhost:5001/",
     "DeleteDirectory": "Temp"
   },
+  // 雪花 Id：WorkerId 每个实例必须唯一（0-1023）。留空时按主机名做稳定哈希推导（重启/重建不变）。
+  // 多副本部署务必为每个副本显式指定不同值，且优先级为：环境变量 IdGenerator__WorkerId > 本配置。
+  "IdGenerator": {
+    "WorkerId": ""
+  },
   //JWT的配置
   //【安全】IssuerSigningKey 严禁提交真实密钥到仓库。注意：经实测（见 DEPLOY.md），Furion 在 Serve.Run 宿主下
   // 捕获的 App.Configuration 不包含进程环境变量，因此请通过 json 文件配置（任选其一）：

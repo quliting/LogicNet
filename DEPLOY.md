@@ -44,6 +44,19 @@ docker run --rm -u 0 -v "$PWD":/mnt mcr.microsoft.com/dotnet/aspnet:9.0 chown 16
 是 `640 root:root`，容器内非 root 用户读不到，会导致服务名（如 `mysql`）解析失败。compose 将其只读
 挂载到容器内 `/etc/resolv.conf`，显式使用 Docker 内置 DNS（127.0.0.11），保持非 root 运行。
 
+### 雪花 Id（WorkerId）
+
+- 生成器为 Yitter 雪花算法：`BaseTime=2025-05-04`、`WorkerIdBitLength=10`、`SeqBitLength=6`，三者固定不可改动
+  （改位宽/基准点会让新旧 Id 落在不同网格上，存在重叠风险）。
+- WorkerId 取值优先级：环境变量 `IdGenerator__WorkerId` > 配置 `IdGenerator:WorkerId` > 按主机名做稳定哈希推导。
+- compose 已固定 `hostname: logicnet-app`，单实例重启、容器重建、换镜像后推导结果不变；
+  `IdGenerator__WorkerId` 由 `.env` 的 `ID_GENERATOR_WORKER_ID` 注入，留空即走推导。
+- WorkerId 越界（不在 0-1023）或非整数会直接启动失败（fail-fast），避免带病上线导致主键冲突。
+- **多副本**：compose 的固定 `hostname` 会被所有副本共用，不能依赖自动推导。每个副本必须注入不同的
+  `IdGenerator__WorkerId`（如拆成多个 service 分别写 0/1/2，或 `docker run -e IdGenerator__WorkerId=N`）。
+  同一 WorkerId 的多实例在同一毫秒会生成相同 Id，直接触发主键冲突。
+- 存量数据全部由 WorkerId=0 生成；调整 WorkerId 不影响已有 Id 的读取与更新。
+
 数据库方案切换：默认方案 A 复用外部 MySQL；方案 B（compose 内置 MySQL）启动时追加覆盖文件，
 并把 `secrets.json` 连接串指向 `Data Source=mysql`（密码与 `.env` 的 `DB_ROOT_PASSWORD` 一致）：
 

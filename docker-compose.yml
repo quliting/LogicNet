@@ -18,12 +18,17 @@ services:
       dockerfile: LogicNet.Web.Entry/Dockerfile
     image: logicnet:latest
     container_name: logicnet-app
+    # 固定主机名：WorkerId 未显式配置时按主机名推导，固定主机名保证重启/容器重建后 WorkerId 不变。
+    # 多副本部署不能共用该主机名，需为每个副本注入不同的 IdGenerator__WorkerId（见 DEPLOY.md）。
+    hostname: logicnet-app
     restart: unless-stopped
     ports:
       # 左侧为宿主端口，可在 .env 用 APP_PORT 覆盖
       - "${APP_PORT:-8080}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      # 雪花 Id WorkerId（0-1023）：留空则按主机名推导；多副本时每个副本必须不同
+      IdGenerator__WorkerId: "${ID_GENERATOR_WORKER_ID:-}"
     volumes:
       # 机密配置（JWT 密钥、数据库连接串）：只读挂载，宿主上属主应为容器内 app 用户（uid 1654）、
       # 权限 600。准备步骤见 DEPLOY.md；模板见 secrets.json.example。

@@ -16,6 +16,7 @@ using LogicNet.Core;
 using LogicNet.Core.Entity;
 using LogicNet.Core.Security;
 using LogicNet.Web.Core.Audit;
+using LogicNet.Web.Core.Id;
 using LogicNet.Web.Core.Job;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -75,12 +76,30 @@ public class Startup : AppStartup
             })
             .AddInjectWithUnifyResult();
 
-        YitIdHelper.SetIdGenerator(new IdGeneratorOptions()
+        // 雪花 Id：WorkerId 必须每实例唯一且重启稳定。优先取环境变量（多副本按容器注入），
+        // 其次配置文件 IdGenerator:WorkerId；都未配置时按主机名稳定推导，避免所有实例共用 0 号。
+        var workerIdSetting = Environment.GetEnvironmentVariable("IdGenerator__WorkerId");
+        var workerIdSource = "环境变量 IdGenerator__WorkerId";
+        if (string.IsNullOrWhiteSpace(workerIdSetting))
         {
-            WorkerIdBitLength = 10,
-            SeqBitLength = 6,
-            BaseTime = new DateTime(2025, 5, 4),
-        });
+            workerIdSetting = App.Configuration["IdGenerator:WorkerId"];
+            workerIdSource = "配置 IdGenerator:WorkerId";
+        }
+
+        if (string.IsNullOrWhiteSpace(workerIdSetting))
+        {
+            workerIdSetting = null;
+            workerIdSource = $"主机名 {Environment.MachineName} 推导";
+        }
+
+        var workerId = IdGeneratorSetup.ResolveWorkerId(workerIdSetting, Environment.MachineName);
+        IdGeneratorSetup.Configure(workerId);
+        // SqlSugar 的雪花 Id 入口统一委托给 Yitter，业务插入无需手工赋值
+        StaticConfig.CustomSnowFlakeFunc = YitIdHelper.NextId;
+        Log.Information("雪花 Id 初始化：WorkerId={WorkerId}（来源：{Source}），BaseTime={BaseTime:yyyy-MM-dd}，" +
+                 "WorkerIdBitLength={WorkerBits}，SeqBitLength={SeqBits}",
+            workerId, workerIdSource, IdGeneratorSetup.BaseTime,
+            IdGeneratorSetup.WorkerIdBitLength, IdGeneratorSetup.SeqBitLength);
 
         services.AddCaptcha(App.Configuration);
 
@@ -211,9 +230,6 @@ public class Startup : AppStartup
         });
 
         services.AddScoped(typeof(Repository<>));
-
-        SnowFlakeSingle.WorkId = 1;
-        StaticConfig.CustomSnowFlakeFunc = YitIdHelper.NextId;
 
         services.AddSignalR();
 
