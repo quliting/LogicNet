@@ -142,7 +142,7 @@ public sealed class AuditLogMiddleware
     {
         var path = request.Path.Value ?? string.Empty;
 
-        foreach (var skipPath in _options.SkipPaths)
+        foreach (var skipPath in _options.SkipPaths ?? Array.Empty<string>())
             if (!string.IsNullOrWhiteSpace(skipPath)
                 && path.StartsWith(skipPath, StringComparison.OrdinalIgnoreCase))
                 return true;
