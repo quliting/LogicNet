@@ -18,6 +18,7 @@ using LogicNet.Core.Security;
 using LogicNet.Web.Core.Audit;
 using LogicNet.Web.Core.Id;
 using LogicNet.Web.Core.Job;
+using LogicNet.Web.Core.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -68,6 +69,8 @@ public class Startup : AppStartup
                 // item.JsonSerializerOptions.Converters.Add(new SystemTextJsonStringToPriceJsonConverter());
                 item.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: true));
                 item.JsonSerializerOptions.Converters.Add(new SystemTextJsonDateTimeOffsetJsonConverter());
+                // long（含雪花 Id）统一输出为字符串，避免超过 JS Number.MAX_SAFE_INTEGER 后前端丢精度
+                item.JsonSerializerOptions.Converters.Add(new LongToStringJsonConverter());
                 item.JsonSerializerOptions.PropertyNamingPolicy = null;
                 item.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             }).AddInjectWithUnifyResult<TemplateRestfulResultProvider>(item =>

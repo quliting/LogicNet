@@ -24,8 +24,8 @@ Furion 动态 API，路由前缀 `/Api/Menu`。请求体为 JSON；单参数接�
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `Id` | long | 雪花 Id |
-| `ParentId` | long | 上级 Id，顶级为 `0` |
+| `Id` | string | 雪花 Id；JSON 输出为字符串，避免前端 Number 精度丢失 |
+| `ParentId` | string | 上级 Id，顶级为 `"0"` |
 | `Name` | string | 显示名 |
 | `Path` | string | 前端路由，必须以 `/` 开头；同一 `ParentId` 下唯一 |
 | `Component` | string? | 前端组件标识，目录可为空 |
@@ -36,6 +36,9 @@ Furion 动态 API，路由前缀 `/Api/Menu`。请求体为 JSON；单参数接�
 | `IsEnabled` | bool | 是否启用 |
 | `IsVisible` | bool | 是否在侧栏显示 |
 | `Children` | array | 仅树接口返回，按 `Sort` 升序 |
+
+> 所有 `long` 字段（`Id`/`ParentId`/`CreateUserId` 等）统一序列化为 JSON 字符串；
+> 入参读取同时兼容字符串与数字，前端请按字符串透传，不要转成 Number。
 
 ## 树与删除策略
 
