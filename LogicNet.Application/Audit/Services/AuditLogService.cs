@@ -24,13 +24,36 @@ public class AuditLogService(ISqlSugarClient db) : LogicBase
     {
         var httpMethod = input.HttpMethod?.Trim().ToUpperInvariant();
 
-        var query = db.Queryable<AuditLog>()
-            .WhereIF(input.StartTime.HasValue, x => x.CreateTime >= input.StartTime.Value)
-            .WhereIF(input.EndTime.HasValue, x => x.CreateTime <= input.EndTime.Value)
-            .WhereIF(input.UserId.HasValue, x => x.UserId == input.UserId.Value)
+        var query = db.Queryable<AuditLog>();
+
+        // 时间等可空条件用显式分支：避免可空 .Value 在 ORM 表达式中被忽略
+        if (input.StartTime.HasValue)
+        {
+            var startTime = input.StartTime.Value;
+            query = query.Where(x => x.CreateTime >= startTime);
+        }
+
+        if (input.EndTime.HasValue)
+        {
+            var endTime = input.EndTime.Value;
+            query = query.Where(x => x.CreateTime <= endTime);
+        }
+
+        if (input.UserId.HasValue)
+        {
+            var userId = input.UserId.Value;
+            query = query.Where(x => x.UserId == userId);
+        }
+
+        if (input.Succeeded.HasValue)
+        {
+            var succeeded = input.Succeeded.Value;
+            query = query.Where(x => x.Succeeded == succeeded);
+        }
+
+        query = query
             .WhereIF(input.UserName.NotNullOrEmpty(), x => x.UserName.Contains(input.UserName))
             .WhereIF(input.Path.NotNullOrEmpty(), x => x.Path.Contains(input.Path))
-            .WhereIF(input.Succeeded.HasValue, x => x.Succeeded == input.Succeeded.Value)
             .WhereIF(!httpMethod.IsNullOrEmpty(), x => x.HttpMethod == httpMethod)
             .OrderByDescending(x => x.CreateTime)
             .OrderByDescending(x => x.Id);

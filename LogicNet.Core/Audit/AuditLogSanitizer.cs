@@ -34,9 +34,9 @@ public static class AuditLogSanitizer
         "(\"(?:" + KeyPattern + ")\"\\s*:\\s*)(\"(?:[^\"\\\\]|\\\\.)*\"|[^,}\\s]+)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    // 表单/查询串/类 JSON 无引号形式 key=value 或 key: value
+    // 表单/查询串/类 JSON 无引号形式 key=value 或 key: value（键前不能紧跟字母数字，避免误伤 PermissionCode）
     private static readonly Regex KeyValueSecretRegex = new(
-        "(?<key>(?:^|[&;,{\\s])(?:" + KeyPattern + ")\\s*[=:]\\s*)(?<value>[^&;,}\\s]*)",
+        "(?<key>(?<![A-Za-z0-9_])(?:" + KeyPattern + ")\\s*[=:]\\s*)(?<value>[^&;,}\\s]*)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly JsonSerializerOptions JsonOptions = new()
