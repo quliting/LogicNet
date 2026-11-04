@@ -4,6 +4,7 @@ using LogicNet.Core.Entity;
 using LogicNet.Core.Security;
 using Masuit.Tools;
 using Masuit.Tools.Models;
+using Microsoft.AspNetCore.Authorization;
 using SqlSugar;
 using MenuEntity = LogicNet.Core.Entity.Menu;
 
@@ -18,8 +19,9 @@ public class MenuService(ISqlSugarClient db) : LogicBase
     private readonly ISqlSugarClient db = db;
 
     /// <summary>
-    ///     新增菜单：校验上级存在且不成环，同一上级下路由路径唯一
+    ///     新增菜单：校验上级存在且不成环，同一上级下路由路径唯一（仅 Admin）
     /// </summary>
+    [Authorize(Roles = "Admin")]
     public async Task<long> CreateMenuAsync(AddMenuInputDto input)
     {
         ValidateInput(input);
@@ -40,8 +42,9 @@ public class MenuService(ISqlSugarClient db) : LogicBase
     }
 
     /// <summary>
-    ///     编辑菜单：不允许把上级指向自身或自己的后代，避免形成环
+    ///     编辑菜单：不允许把上级指向自身或自己的后代，避免形成环（仅 Admin）
     /// </summary>
+    [Authorize(Roles = "Admin")]
     public async Task<bool> UpdateMenuAsync(UpdateMenuInputDto input)
     {
         if (input.Id <= 0) throw Oops.Bah("菜单 Id 无效");
@@ -65,8 +68,9 @@ public class MenuService(ISqlSugarClient db) : LogicBase
     }
 
     /// <summary>
-    ///     删除菜单（软删除）：存在子节点时拒绝并给出可读提示，需先删除子节点
+    ///     删除菜单（软删除）：存在子节点时拒绝并给出可读提示，需先删除子节点（仅 Admin）
     /// </summary>
+    [Authorize(Roles = "Admin")]
     public async Task<bool> DeleteMenuAsync(long id)
     {
         if (id <= 0) throw Oops.Bah("菜单 Id 无效");
@@ -84,8 +88,9 @@ public class MenuService(ISqlSugarClient db) : LogicBase
     }
 
     /// <summary>
-    ///     菜单详情
+    ///     菜单详情（仅 Admin）
     /// </summary>
+    [Authorize(Roles = "Admin")]
     public async Task<MenuOutputDto> GetMenuDetailAsync(long id)
     {
         var result = await db.Queryable<MenuEntity>().Where(x => x.Id == id).Select<MenuOutputDto>().FirstAsync();
@@ -94,8 +99,9 @@ public class MenuService(ISqlSugarClient db) : LogicBase
     }
 
     /// <summary>
-    ///     菜单列表：名称模糊、类型/启用状态过滤，分页复用 BaseInput 的 PageSize 钳制
+    ///     菜单列表：名称模糊、类型/启用状态过滤，分页复用 BaseInput 的 PageSize 钳制（仅 Admin）
     /// </summary>
+    [Authorize(Roles = "Admin")]
     public async Task<PagedList<MenuOutputDto>> GetMenuListAsync(GetMenuListInputDto input)
     {
         var query = db.Queryable<MenuEntity>()
@@ -109,8 +115,9 @@ public class MenuService(ISqlSugarClient db) : LogicBase
     }
 
     /// <summary>
-    ///     管理端菜单树：全部未删除菜单，children 嵌套，同级按 Sort 升序
+    ///     管理端菜单树：全部未删除菜单，children 嵌套，同级按 Sort 升序（仅 Admin）
     /// </summary>
+    [Authorize(Roles = "Admin")]
     public async Task<List<MenuTreeOutputDto>> GetMenuTreeAsync()
     {
         var list = await db.Queryable<MenuEntity>().Select<MenuTreeOutputDto>().ToListAsync();
