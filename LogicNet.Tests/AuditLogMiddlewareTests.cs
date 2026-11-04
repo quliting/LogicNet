@@ -208,4 +208,76 @@ public class AuditLogMiddlewareTests
         Assert.DoesNotContain("S3cretPass!987", log.ExceptionMessage);
         Assert.Contains("***", log.ExceptionMessage);
     }
+
+    [Fact]
+    public async Task 默认只把慢SQL挂到当前审计记录()
+    {
+        var options = new AuditLogOptions();
+        var queue = CreateQueue(options);
+        var middleware = CreateMiddleware(context =>
+        {
+            var collector = (AuditSqlCollector)context.Items[AuditLogContextKeys.SqlCollector];
+            collector.Add("SELECT fast", null, 10);
+            collector.Add("SELECT slow", null, 300);
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            return Task.CompletedTask;
+        }, queue, options);
+
+        await middleware.InvokeAsync(CreateContext("POST", "/Api/Menu/CreateMenu", "{\"a\":1}"));
+
+        Assert.True(queue.TryDequeue(out var log));
+        Assert.Equal(2, log.SqlCount);
+        Assert.Equal(310, log.SqlElapsedMs);
+        Assert.Equal(1, log.SlowSqlCount);
+        Assert.Single(log.SqlLogs);
+        Assert.Equal("SELECT slow", log.SqlLogs[0].SqlText);
+        Assert.True(log.SqlLogs[0].IsSlow);
+    }
+
+    [Fact]
+    public async Task 失败SQL会挂到审计记录并带走脱敏后的失败原因()
+    {
+        var options = new AuditLogOptions();
+        var queue = CreateQueue(options);
+        var middleware = CreateMiddleware(context =>
+        {
+            var collector = (AuditSqlCollector)context.Items[AuditLogContextKeys.SqlCollector];
+            collector.Add("UPDATE UserInfo SET Password=@password", new[]
+            {
+                new SqlSugar.SugarParameter("@password", "S3cretPass!987")
+            }, 5, "accessToken=abc123 无效");
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            return Task.CompletedTask;
+        }, queue, options);
+
+        await middleware.InvokeAsync(CreateContext("POST", "/Api/UserInfo/UpdatePassword", "{\"a\":1}"));
+
+        Assert.True(queue.TryDequeue(out var log));
+        Assert.Single(log.SqlLogs);
+        Assert.DoesNotContain("S3cretPass!987", log.SqlLogs[0].Parameters);
+        Assert.Contains("***", log.SqlLogs[0].Parameters);
+        Assert.DoesNotContain("abc123", log.SqlLogs[0].ErrorMessage);
+        Assert.Contains("***", log.SqlLogs[0].ErrorMessage);
+    }
+
+    [Fact]
+    public async Task 关闭SQL采集后不再挂明细但仍正常记录审计()
+    {
+        var options = new AuditLogOptions { Sql = new AuditSqlOptions { Enabled = false } };
+        var queue = CreateQueue(options);
+        var capturedCollector = false;
+        var middleware = CreateMiddleware(context =>
+        {
+            capturedCollector = context.Items.ContainsKey(AuditLogContextKeys.SqlCollector);
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            return Task.CompletedTask;
+        }, queue, options);
+
+        await middleware.InvokeAsync(CreateContext("POST", "/Api/Menu/CreateMenu", "{\"a\":1}"));
+
+        Assert.False(capturedCollector);
+        Assert.True(queue.TryDequeue(out var log));
+        Assert.Equal(0, log.SqlCount);
+        Assert.Null(log.SqlLogs);
+    }
 }

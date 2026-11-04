@@ -13,12 +13,13 @@ public class AuditLogServiceTests
 {
     private static AuditLogService CreateService(SqlSugarScope db)
     {
-        db.CodeFirst.InitTables(typeof(AuditLog));
+        db.CodeFirst.InitTables(typeof(AuditLog), typeof(AuditSqlLog));
         return new AuditLogService(db);
     }
 
     private static AuditLog Seed(SqlSugarScope db, long id, long? userId, string userName, string path,
-        DateTime createTime, bool succeeded = true, string httpMethod = "POST", string requestBody = null)
+        DateTime createTime, bool succeeded = true, string httpMethod = "POST", string requestBody = null,
+        int sqlCount = 0, long sqlElapsedMs = 0, int slowSqlCount = 0)
     {
         var log = new AuditLog
         {
@@ -32,6 +33,9 @@ public class AuditLogServiceTests
             ResultCode = succeeded ? 200 : 500,
             Succeeded = succeeded,
             DurationMs = 10,
+            SqlCount = sqlCount,
+            SqlElapsedMs = sqlElapsedMs,
+            SlowSqlCount = slowSqlCount,
             CreateTime = createTime
         };
         db.Insertable(log).ExecuteCommand();
@@ -42,6 +46,31 @@ public class AuditLogServiceTests
             .Where(x => x.Id == id)
             .ExecuteCommand();
         return log;
+    }
+
+    private static AuditSqlLog SeedSql(SqlSugarScope db, long id, long auditLogId, long elapsedMs,
+        bool isSlow, DateTime createTime, string sqlText = "SELECT 1", string parameters = null,
+        string errorMessage = null)
+    {
+        var detail = new AuditSqlLog
+        {
+            Id = id,
+            AuditLogId = auditLogId,
+            TraceId = "trace-" + auditLogId,
+            SqlText = sqlText,
+            Parameters = parameters,
+            ElapsedMs = elapsedMs,
+            IsSlow = isSlow,
+            ErrorMessage = errorMessage,
+            CreateTime = createTime
+        };
+        db.Insertable(detail).ExecuteCommand();
+        // CreateTime 标记了 InsertServerTime，插入后显式回写以模拟历史数据
+        db.Updateable<AuditSqlLog>()
+            .SetColumns(x => x.CreateTime == createTime)
+            .Where(x => x.Id == id)
+            .ExecuteCommand();
+        return detail;
     }
 
     private static void SeedFive(SqlSugarScope db)
@@ -157,5 +186,86 @@ public class AuditLogServiceTests
 
         await Assert.ThrowsAnyAsync<Exception>(() => service.CleanupAuditLogsAsync(0));
         await Assert.ThrowsAnyAsync<Exception>(() => service.CleanupAuditLogsAsync(3651));
+    }
+
+    [Fact]
+    public async Task 列表返回SQL汇总字段()
+    {
+        using var db = TestDb.Create();
+        var service = CreateService(db);
+        Seed(db, 30, 1, "admin", "/Api/Menu/CreateMenu", DateTime.Now, true, "POST", null, 4, 420, 1);
+
+        var page = await service.GetAuditLogListAsync(new GetAuditLogListInputDto { PageSize = 100 });
+
+        Assert.Single(page.Data);
+        Assert.Equal(4, page.Data[0].SqlCount);
+        Assert.Equal(420, page.Data[0].SqlElapsedMs);
+        Assert.Equal(1, page.Data[0].SlowSqlCount);
+    }
+
+    [Fact]
+    public async Task 详情返回按执行顺序排列的SQL明细()
+    {
+        using var db = TestDb.Create();
+        var service = CreateService(db);
+        Seed(db, 40, 1, "admin", "/Api/Menu/CreateMenu", DateTime.Now, true, "POST", null, 3, 315, 1);
+        SeedSql(db, 401, 40, 10, false, DateTime.Now, "SELECT COUNT(*) FROM Menu");
+        SeedSql(db, 402, 40, 300, true, DateTime.Now, "INSERT INTO Menu(Name) VALUES(@name)",
+            "@name=\"菜单\"");
+        SeedSql(db, 403, 40, 5, false, DateTime.Now, "SELECT uniq", errorMessage: "Duplicate entry");
+
+        var detail = await service.GetAuditLogDetailAsync(40);
+
+        Assert.Equal(3, detail.SqlLogs.Count);
+        Assert.Equal(new[] { 401L, 402L, 403L }, detail.SqlLogs.Select(x => x.Id).ToArray());
+        Assert.True(detail.SqlLogs[1].IsSlow);
+        Assert.Equal("Duplicate entry", detail.SqlLogs[2].ErrorMessage);
+        Assert.Equal(3, detail.SqlCount);
+    }
+
+    [Fact]
+    public async Task 慢SQL列表支持时间区间与耗时阈值过滤()
+    {
+        using var db = TestDb.Create();
+        var service = CreateService(db);
+        var now = DateTime.Now;
+        Seed(db, 50, 1, "admin", "/Api/Menu/CreateMenu", now.AddDays(-5), true, "POST");
+        Seed(db, 51, 1, "admin", "/Api/UserInfo/Login", now.AddDays(-1), true, "POST");
+        SeedSql(db, 501, 50, 500, true, now.AddDays(-5), "SELECT A");
+        SeedSql(db, 502, 50, 50, false, now.AddDays(-5), "SELECT fast");
+        SeedSql(db, 503, 51, 900, true, now.AddDays(-1), "SELECT B");
+
+        var all = await service.GetSlowSqlListAsync(new GetSlowSqlListInputDto { PageSize = 100 });
+        Assert.Equal(2, all.Data.Count);
+        Assert.All(all.Data, x => Assert.True(x.ElapsedMs >= 200));
+        Assert.Equal("admin", all.Data[0].UserName);
+
+        var filtered = await service.GetSlowSqlListAsync(new GetSlowSqlListInputDto
+        {
+            PageSize = 100,
+            StartTime = now.AddDays(-2),
+            MinElapsedMs = 800
+        });
+        Assert.Single(filtered.Data);
+        Assert.Equal(503, filtered.Data[0].Id);
+    }
+
+    [Fact]
+    public async Task 清理过期审计记录时同步删除SQL明细()
+    {
+        using var db = TestDb.Create();
+        var service = CreateService(db);
+        Seed(db, 60, 1, "admin", "/Api/Old", DateTime.Now.AddDays(-40));
+        Seed(db, 61, 1, "admin", "/Api/New", DateTime.Now.AddDays(-5));
+        SeedSql(db, 601, 60, 300, true, DateTime.Now.AddDays(-40), "SELECT old");
+        SeedSql(db, 611, 61, 300, true, DateTime.Now.AddDays(-5), "SELECT new");
+
+        var deleted = await service.CleanupAuditLogsAsync(30);
+
+        Assert.Equal(1, deleted);
+        Assert.Single(db.Queryable<AuditLog>().ToList());
+        var remaining = db.Queryable<AuditSqlLog>().ToList();
+        Assert.Single(remaining);
+        Assert.Equal(61, remaining[0].AuditLogId);
     }
 }

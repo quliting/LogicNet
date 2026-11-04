@@ -58,6 +58,33 @@ public class AuditLogPersisterTests
     }
 
     [Fact]
+    public async Task SQL明细随批量落库并回填所属审计Id()
+    {
+        using var db = TestDb.Create();
+        db.CodeFirst.InitTables(typeof(AuditLog), typeof(AuditSqlLog));
+
+        var log = CreateLog(0);
+        log.TraceId = "trace-1";
+        log.SqlLogs = new List<AuditSqlLog>
+        {
+            new() { SqlText = "SELECT slow", Parameters = "@id=1", ElapsedMs = 300, IsSlow = true },
+            new() { SqlText = "SELECT failed", ElapsedMs = 5, ErrorMessage = "boom" }
+        };
+
+        var result = await AuditLogPersister.PersistAsync(db, new[] { log });
+
+        Assert.True(result);
+        var savedLog = db.Queryable<AuditLog>().First();
+        var details = db.Queryable<AuditSqlLog>().OrderBy(x => x.Id).ToList();
+
+        Assert.Equal(2, details.Count);
+        Assert.All(details, x => Assert.Equal(savedLog.Id, x.AuditLogId));
+        Assert.All(details, x => Assert.Equal("trace-1", x.TraceId));
+        Assert.True(details[0].IsSlow);
+        Assert.Equal("boom", details[1].ErrorMessage);
+    }
+
+    [Fact]
     public async Task 数据库不可用时写入失败但不抛出()
     {
         using var db = new SqlSugarScope(new ConnectionConfig
