@@ -79,7 +79,16 @@
     "SkipPaths": [ "/health", "/Api/AuditLog", "/swagger", "/api-docs" ],
     "QueueCapacity": 10000,
     "RetentionDays": 90,
-    "CleanupHour": 3
+    "CleanupHour": 3,
+    // SQL 执行明细：默认只记录慢 SQL 与失败 SQL；RecordAll=true 可临时记录全部 SQL
+    "Sql": {
+      "Enabled": true,
+      "RecordAll": false,
+      "SlowThresholdMs": 200,
+      "MaxSqlLength": 2000,
+      "MaxParametersLength": 2000,
+      "MaxItemsPerAuditLog": 50
+    }
   },
   // 验证码配置
   "CaptchaOptions": {

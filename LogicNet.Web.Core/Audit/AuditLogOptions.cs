@@ -63,4 +63,9 @@ public class AuditLogOptions
     ///     每日清理执行时刻（0-23，本地时间，默认凌晨 3 点）
     /// </summary>
     public int CleanupHour { get; set; } = 3;
+
+    /// <summary>
+    ///     SQL 执行明细采集配置（节点 AuditLog.Sql）
+    /// </summary>
+    public AuditSqlOptions Sql { get; set; } = new();
 }

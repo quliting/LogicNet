@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using SqlSugar;
 
 namespace LogicNet.Core.Entity;
@@ -97,4 +98,26 @@ public class AuditLog : BaseEntity
     /// </summary>
     [SugarColumn(IsNullable = true, Length = 1024)]
     public string ExceptionMessage { get; set; }
+
+    /// <summary>
+    ///     本次请求执行的 SQL 条数（含未记录明细的快速读 SQL）
+    /// </summary>
+    public int SqlCount { get; set; }
+
+    /// <summary>
+    ///     本次请求 SQL 净耗时合计（毫秒，不含业务代码耗时）
+    /// </summary>
+    public long SqlElapsedMs { get; set; }
+
+    /// <summary>
+    ///     本次请求中超过慢阈值（AuditLog.Sql.SlowThresholdMs）的 SQL 条数
+    /// </summary>
+    public int SlowSqlCount { get; set; }
+
+    /// <summary>
+    ///     请求内采集到的 SQL 明细，仅内存传递，不落 AuditLog 表；
+    ///     由 AuditLogPersister 统一写入 AuditSqlLog 表
+    /// </summary>
+    [SugarColumn(IsIgnore = true)]
+    public List<AuditSqlLog> SqlLogs { get; set; }
 }
