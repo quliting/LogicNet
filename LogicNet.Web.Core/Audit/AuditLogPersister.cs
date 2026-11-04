@@ -32,12 +32,53 @@ public static class AuditLogPersister
                     log.Id = SnowFlakeSingle.Instance.NextId();
 
             await db.Insertable(logs.ToList()).ExecuteCommandAsync();
+
+            // 明细单独写入：即使明细失败也保留已落库的审计主记录，且绝不向调用方抛出
+            await PersistSqlLogsAsync(db, logs, logger);
             return true;
         }
         catch (Exception ex)
         {
             logger?.LogError(ex, "审计日志写入失败，丢弃 {Count} 条记录（不影响主请求）", logs.Count);
             return false;
+        }
+    }
+
+    /// <summary>
+    ///     写入 SQL 明细：回填所属审计 Id 与链路 Id，按 200 条分块避免单次报文过大；
+    ///     失败仅记录 Error，不影响已写入的审计主记录。
+    /// </summary>
+    private static async Task PersistSqlLogsAsync(ISqlSugarClient db, IReadOnlyCollection<AuditLog> logs,
+        ILogger logger)
+    {
+        var details = new List<AuditSqlLog>();
+        foreach (var log in logs)
+        {
+            if (log.SqlLogs is null || log.SqlLogs.Count == 0) continue;
+
+            foreach (var detail in log.SqlLogs)
+            {
+                if (detail.Id == 0) detail.Id = SnowFlakeSingle.Instance.NextId();
+                detail.AuditLogId = log.Id;
+                if (string.IsNullOrEmpty(detail.TraceId)) detail.TraceId = log.TraceId;
+                details.Add(detail);
+            }
+        }
+
+        if (details.Count == 0) return;
+
+        const int chunkSize = 200;
+        try
+        {
+            for (var offset = 0; offset < details.Count; offset += chunkSize)
+            {
+                var chunk = details.Skip(offset).Take(chunkSize).ToList();
+                await db.Insertable(chunk).ExecuteCommandAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "审计 SQL 明细写入失败，丢弃 {Count} 条明细（审计主记录已保留）", details.Count);
         }
     }
 
@@ -49,7 +90,7 @@ public static class AuditLogPersister
     {
         if (Volatile.Read(ref _tableReady) == 1) return;
 
-        db.CodeFirst.InitTables(typeof(AuditLog));
+        db.CodeFirst.InitTables(typeof(AuditLog), typeof(AuditSqlLog));
         Interlocked.Exchange(ref _tableReady, 1);
     }
 }

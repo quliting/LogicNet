@@ -58,6 +58,16 @@ public sealed class AuditLogMiddleware
         }
 
         var shouldRecord = ShouldRecord(context.Request);
+
+        // SQL 明细采集：只对会被审计的请求开启，缓冲区挂在 HttpContext.Items 上，
+        // 与请求一一对应，保证同一请求的 SQL 不会串到其他审计记录
+        AuditSqlCollector sqlCollector = null;
+        if (shouldRecord && _options.Sql.Enabled)
+        {
+            sqlCollector = new AuditSqlCollector(_options.Sql);
+            context.Items[AuditLogContextKeys.SqlCollector] = sqlCollector;
+        }
+
         string requestBody = null;
         if (shouldRecord && _options.RecordRequestBody)
         {
@@ -86,11 +96,27 @@ public sealed class AuditLogMiddleware
         finally
         {
             stopwatch.Stop();
+
+            AuditSqlSnapshot sqlSnapshot = null;
+            if (sqlCollector is not null)
+            {
+                try
+                {
+                    // 先关闭采集再组装审计记录：请求结束后仍在运行的异步任务不会再追加到本记录
+                    sqlSnapshot = sqlCollector.Close();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("审计 SQL 采集快照失败（已忽略）", ex);
+                }
+            }
+
             if (shouldRecord)
             {
                 try
                 {
-                    _queue.Enqueue(BuildLog(context, requestBody, stopwatch.ElapsedMilliseconds, exception));
+                    _queue.Enqueue(BuildLog(context, requestBody, stopwatch.ElapsedMilliseconds, exception,
+                        sqlSnapshot));
                 }
                 catch (Exception ex)
                 {
@@ -98,10 +124,13 @@ public sealed class AuditLogMiddleware
                     Log.Error("审计日志采集失败（已忽略）", ex);
                 }
             }
+
+            if (sqlCollector is not null) context.Items.Remove(AuditLogContextKeys.SqlCollector);
         }
     }
 
-    private AuditLog BuildLog(HttpContext context, string requestBody, long durationMs, Exception exception)
+    private AuditLog BuildLog(HttpContext context, string requestBody, long durationMs, Exception exception,
+        AuditSqlSnapshot sqlSnapshot)
     {
         var request = context.Request;
         var userId = long.TryParse(context.User?.FindFirstValue(JwtClaimNames.UserId), out var parsedUserId)
@@ -126,7 +155,10 @@ public sealed class AuditLogMiddleware
             && succeededItem is bool businessSucceeded)
             succeeded = businessSucceeded && exception is null;
 
-        return new AuditLog
+        var traceId = AuditLogSanitizer.Truncate(Activity.Current?.Id ?? context.TraceIdentifier, MaxTraceIdLength);
+        var createTime = DateTime.Now;
+
+        var log = new AuditLog
         {
             UserId = userId,
             UserName = AuditLogSanitizer.Truncate(userName, 100),
@@ -139,13 +171,34 @@ public sealed class AuditLogMiddleware
             Succeeded = succeeded,
             ClientIp = GetClientIp(context),
             UserAgent = AuditLogSanitizer.Truncate(request.Headers.UserAgent.ToString(), MaxUserAgentLength),
-            TraceId = AuditLogSanitizer.Truncate(Activity.Current?.Id ?? context.TraceIdentifier, MaxTraceIdLength),
+            TraceId = traceId,
             DurationMs = durationMs,
             ExceptionMessage = exception is null
                 ? null
                 : AuditLogSanitizer.SanitizeText(exception.Message, _options.MaxExceptionLength),
-            CreateTime = DateTime.Now
+            SqlCount = sqlSnapshot is null ? 0 : (int)Math.Min(sqlSnapshot.Count, int.MaxValue),
+            SqlElapsedMs = sqlSnapshot?.ElapsedMs ?? 0,
+            SlowSqlCount = sqlSnapshot?.SlowCount ?? 0,
+            CreateTime = createTime
         };
+
+        // 明细只随审计记录在内存中传递，由后台批量落库统一写 AuditSqlLog；
+        // AuditLogId 在写库时由 Persister 回填，避免此处依赖尚未生成的主键
+        if (sqlSnapshot is { Items.Count: > 0 })
+            log.SqlLogs = sqlSnapshot.Items
+                .Select(item => new AuditSqlLog
+                {
+                    TraceId = traceId,
+                    SqlText = item.SqlText,
+                    Parameters = item.Parameters,
+                    ElapsedMs = item.ElapsedMs,
+                    IsSlow = item.IsSlow,
+                    ErrorMessage = item.ErrorMessage,
+                    CreateTime = createTime
+                })
+                .ToList();
+
+        return log;
     }
 
     private bool ShouldSkip(HttpRequest request)
