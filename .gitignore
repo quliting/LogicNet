@@ -408,3 +408,6 @@ rule/
 .env.*
 !.env.example
 secrets.json
+
+# 前端仓库（vben 独立 git 仓库，避免嵌套仓库被后端误提交）
+/Front/
