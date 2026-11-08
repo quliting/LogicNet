@@ -1,5 +1,8 @@
+using System.Security.Claims;
 using System.Threading;
 using LogicNet.Core.Entity;
+using LogicNet.Core.Security;
+using Microsoft.AspNetCore.Http;
 using SqlSugar;
 
 namespace LogicNet.Tests;
@@ -49,5 +52,48 @@ public static class TestDb
         };
         db.Insertable(user).ExecuteCommand();
         return user;
+    }
+
+    /// <summary>
+    ///     建角色/用户角色/角色菜单表并写入角色
+    /// </summary>
+    public static Role SeedRole(SqlSugarScope db, long id, string name)
+    {
+        db.CodeFirst.InitTables(typeof(Role), typeof(UserRole), typeof(RoleMenu));
+        var role = new Role { Id = id, Name = name };
+        db.Insertable(role).ExecuteCommand();
+        return role;
+    }
+
+    /// <summary>
+    ///     绑定用户与角色
+    /// </summary>
+    public static void SeedUserRole(SqlSugarScope db, long userId, long roleId)
+    {
+        db.CodeFirst.InitTables(typeof(UserRole));
+        db.Insertable(new UserRole { UserId = userId, RoleId = roleId }).ExecuteCommand();
+    }
+
+    /// <summary>
+    ///     绑定角色与菜单（isDelete=true 时写入软删除关联，用于唯一索引与恢复场景）
+    /// </summary>
+    public static void SeedRoleMenu(SqlSugarScope db, long roleId, long menuId, bool isDelete = false)
+    {
+        db.CodeFirst.InitTables(typeof(RoleMenu));
+        db.Insertable(new RoleMenu { RoleId = roleId, MenuId = menuId, IsDelete = isDelete })
+            .ExecuteReturnSnowflakeId();
+    }
+
+    /// <summary>
+    ///     构造带登录用户声明的 HttpContextAccessor（角色由数据库 UserRole 决定）
+    /// </summary>
+    public static IHttpContextAccessor CreateAccessor(long userId)
+    {
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+            new[] { new Claim(JwtClaimNames.UserId, userId.ToString()) }, "TestAuth"));
+        return new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext { User = principal }
+        };
     }
 }

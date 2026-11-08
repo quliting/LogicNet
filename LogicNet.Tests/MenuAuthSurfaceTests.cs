@@ -42,6 +42,26 @@ public class MenuAuthSurfaceTests
     }
 
     [Fact]
+    public void 角色菜单绑定方法限定Admin角色()
+    {
+        var type = typeof(RoleMenuService);
+        foreach (var methodName in new[]
+                 {
+                     nameof(RoleMenuService.GetRoleMenusAsync),
+                     nameof(RoleMenuService.SaveRoleMenusAsync)
+                 })
+        {
+            var method = type.GetMethod(methodName);
+            Assert.NotNull(method);
+
+            var attribute = method.GetCustomAttribute<AuthorizeAttribute>();
+            Assert.NotNull(attribute);
+            Assert.Equal("Admin", attribute.Roles);
+            Assert.Null(method.GetCustomAttribute<AllowAnonymousAttribute>());
+        }
+    }
+
+    [Fact]
     public void GetMyMenus不匿名且不额外限制角色()
     {
         var method = typeof(MenuService).GetMethod(nameof(MenuService.GetMyMenusAsync));

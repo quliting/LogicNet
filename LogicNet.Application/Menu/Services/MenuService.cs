@@ -17,6 +17,11 @@ namespace LogicNet.Application.Menu.Services;
 /// </summary>
 public class MenuService(ISqlSugarClient db, IHttpContextAccessor httpContextAccessor) : LogicBase
 {
+    /// <summary>
+    ///     Admin 角色名：与 DatabaseInitializer.DefaultRoles 保持一致
+    /// </summary>
+    private const string AdminRoleName = "Admin";
+
     private readonly ISqlSugarClient db = db;
     private readonly IHttpContextAccessor httpContextAccessor = httpContextAccessor;
 
@@ -150,12 +155,30 @@ public class MenuService(ISqlSugarClient db, IHttpContextAccessor httpContextAcc
     }
 
     /// <summary>
-    ///     角色过滤扩展点：本轮未实现 RoleMenu 绑定，所有登录用户返回同一套启用菜单。
-    ///     后续接入角色时只改这里（按 userId Join 菜单角色关联表收窄），不要在各查询方法散落权限条件。
+    ///     角色收窄的唯一入口：所有“当前用户可见菜单”的查询都必须经过这里，不要在各查询方法散落权限条件。
+    ///     - Admin 角色兜底放行：不依赖 RoleMenu 绑定，新增菜单也不会把管理员挡在外面；
+    ///     - 其它角色按 RoleMenu 绑定过滤，未绑定任何菜单时返回空。
+    ///     角色以数据库 UserRole/Role 为准（而非仅信任令牌声明），角色调整后无需重新登录即可生效。
     /// </summary>
-    private static ISugarQueryable<MenuEntity> ApplyRoleFilter(ISugarQueryable<MenuEntity> query, long userId)
+    private ISugarQueryable<MenuEntity> ApplyRoleFilter(ISugarQueryable<MenuEntity> query, long userId)
     {
-        return query;
+        if (userId <= 0) return query.Where(x => x.Id < 0);
+
+        var roleIds = db.Queryable<UserRole>()
+            .Where(x => x.UserId == userId)
+            .Select(x => x.RoleId)
+            .ToList();
+        if (roleIds.Count == 0) return query.Where(x => x.Id < 0);
+
+        var isAdmin = db.Queryable<Role>()
+            .Where(x => roleIds.Contains(x.Id) && x.Name == AdminRoleName)
+            .Any();
+        if (isAdmin) return query;
+
+        // 子查询按 RoleMenu 收窄：软删除关联不参与授权
+        return query.Where(menu => SqlFunc.Subqueryable<RoleMenu>()
+            .Where(link => link.MenuId == menu.Id && roleIds.Contains(link.RoleId) && !link.IsDelete)
+            .Any());
     }
 
     /// <summary>

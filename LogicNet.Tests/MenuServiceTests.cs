@@ -13,10 +13,10 @@ namespace LogicNet.Tests;
 /// </summary>
 public class MenuServiceTests
 {
-    private static MenuService CreateService(SqlSugarScope db)
+    private static MenuService CreateService(SqlSugarScope db, IHttpContextAccessor accessor = null)
     {
         db.CodeFirst.InitTables(typeof(MenuEntity));
-        return new MenuService(db, new HttpContextAccessor());
+        return new MenuService(db, accessor ?? new HttpContextAccessor());
     }
 
     private static MenuEntity SeedMenu(SqlSugarScope db, long id, long parentId, string name, string path,
@@ -161,7 +161,9 @@ public class MenuServiceTests
     public async Task GetMyMenus仅返回已启用可见且非按钮()
     {
         using var db = TestDb.Create();
-        var service = CreateService(db);
+        var adminRole = TestDb.SeedRole(db, 10, "Admin");
+        TestDb.SeedUserRole(db, 1001, adminRole.Id);
+        var service = CreateService(db, TestDb.CreateAccessor(1001));
         SeedMenu(db, 1, 0, "系统", "/system", 0, MenuType.Directory);
         SeedMenu(db, 2, 1, "可见菜单", "/system/menu", 1);
         SeedMenu(db, 3, 1, "禁用菜单", "/system/disabled", 2, isEnabled: false);
@@ -172,9 +174,49 @@ public class MenuServiceTests
 
         var tree = await service.GetMyMenusAsync();
 
+        // Admin 兜底：未写入任何 RoleMenu 绑定也返回全量启用可见菜单
+        Assert.Empty(db.Queryable<RoleMenu>().ToList());
+
         var root = Assert.Single(tree);
         Assert.Equal(1, root.Id);
         Assert.Equal(new[] { 2L }, root.Children.Select(x => x.Id).ToArray());
+    }
+
+    [Fact]
+    public async Task 普通角色仅返回RoleMenu已绑定的菜单()
+    {
+        using var db = TestDb.Create();
+        var userRole = TestDb.SeedRole(db, 20, "User");
+        TestDb.SeedUserRole(db, 2001, userRole.Id);
+        var service = CreateService(db, TestDb.CreateAccessor(2001));
+
+        SeedMenu(db, 1, 0, "系统", "/system", 0, MenuType.Directory);
+        SeedMenu(db, 2, 1, "菜单管理", "/system/menu", 1);
+        SeedMenu(db, 3, 0, "其它", "/other", 2, MenuType.Directory);
+        SeedMenu(db, 4, 3, "其它子页", "/other/page", 0);
+
+        TestDb.SeedRoleMenu(db, userRole.Id, 1);
+        TestDb.SeedRoleMenu(db, userRole.Id, 2);
+
+        var tree = await service.GetMyMenusAsync();
+
+        var root = Assert.Single(tree);
+        Assert.Equal(1, root.Id);
+        Assert.Equal(new[] { 2L }, root.Children.Select(x => x.Id).ToArray());
+    }
+
+    [Fact]
+    public async Task 未绑定菜单的角色返回空导航()
+    {
+        using var db = TestDb.Create();
+        var userRole = TestDb.SeedRole(db, 21, "User");
+        TestDb.SeedUserRole(db, 2002, userRole.Id);
+        var service = CreateService(db, TestDb.CreateAccessor(2002));
+
+        SeedMenu(db, 1, 0, "系统", "/system", 0, MenuType.Directory);
+        SeedMenu(db, 2, 1, "菜单管理", "/system/menu", 1);
+
+        Assert.Empty(await service.GetMyMenusAsync());
     }
 
     [Fact]
