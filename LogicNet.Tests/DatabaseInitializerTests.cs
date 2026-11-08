@@ -10,7 +10,7 @@ namespace LogicNet.Tests;
 public class DatabaseInitializerTests
 {
     [Fact]
-    public void Initialize创建四表与索引()
+    public void Initialize创建基础表与索引()
     {
         using var db = TestDb.Create();
 
@@ -20,6 +20,7 @@ public class DatabaseInitializerTests
         Assert.True(db.DbMaintenance.IsAnyTable(nameof(Role), false));
         Assert.True(db.DbMaintenance.IsAnyTable(nameof(UserRole), false));
         Assert.True(db.DbMaintenance.IsAnyTable(nameof(Menu), false));
+        Assert.True(db.DbMaintenance.IsAnyTable(nameof(RoleMenu), false));
 
         var indexes = db.Ado.GetDataTable(
                 "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='UserInfo'")
@@ -33,6 +34,12 @@ public class DatabaseInitializerTests
         Assert.Contains("IX_Menu_ParentId", menuIndexes);
         Assert.Contains("IX_Menu_Sort", menuIndexes);
         Assert.Contains("UX_Menu_Parent_Path", menuIndexes);
+
+        var roleMenuIndexes = db.Ado.GetDataTable(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='RoleMenu'")
+            .Rows.Cast<System.Data.DataRow>().Select(r => r["name"]?.ToString()).ToList();
+        Assert.Contains("IX_RoleMenu_MenuId", roleMenuIndexes);
+        Assert.Contains("UX_RoleMenu_Role_Menu", roleMenuIndexes);
     }
 
     [Fact]
@@ -81,5 +88,25 @@ public class DatabaseInitializerTests
         Assert.Equal(2, roles.Count);
         Assert.Contains("Admin", roles);
         Assert.Contains("User", roles);
+    }
+
+    [Fact]
+    public void Initialize为Admin灌入全部菜单关联且幂等()
+    {
+        using var db = TestDb.Create();
+
+        DatabaseInitializer.Initialize(db);
+        DatabaseInitializer.Initialize(db);
+
+        var admin = db.Queryable<Role>().Single(x => x.Name == "Admin");
+        var menuIds = db.Queryable<Menu>().Select(x => x.Id).ToList();
+        var linkedIds = db.Queryable<RoleMenu>()
+            .Where(x => x.RoleId == admin.Id)
+            .Select(x => x.MenuId)
+            .ToList();
+
+        // Admin 与全部存量菜单一一对应，且重复初始化不产生重复关联
+        Assert.Equal(menuIds.OrderBy(x => x).ToArray(), linkedIds.OrderBy(x => x).ToArray());
+        Assert.Equal(menuIds.Count, db.Queryable<RoleMenu>().ClearFilter().Count());
     }
 }

@@ -21,7 +21,7 @@ public static class DatabaseInitializer
     {
         // CodeFirst 建表：新环境自动创建表结构与 SugarIndex 声明的索引
         db.CodeFirst.InitTables(typeof(UserInfo), typeof(Role), typeof(UserRole), typeof(Menu),
-            typeof(AuditLog), typeof(AuditSqlLog));
+            typeof(RoleMenu), typeof(AuditLog), typeof(AuditSqlLog));
 
         // 幂等角色种子：仅插入库中尚不存在的角色，可重复执行
         var existingNames = db.Queryable<Role>().Select(x => x.Name).ToList();
@@ -32,6 +32,34 @@ public static class DatabaseInitializer
             db.Insertable(newRoles).ExecuteReturnSnowflakeIdList();
 
         SeedMenus(db);
+        SeedAdminRoleMenus(db);
+    }
+
+    /// <summary>
+    ///     Admin 角色关联全部存量菜单：数据层与代码层兜底保持一致。
+    ///     仅补插缺失关联（含软删除行的判断），不复活管理员主动取消的绑定；
+    ///     后续新增菜单由 MenuService.ApplyRoleFilter 的 Admin 兜底保证可见。
+    /// </summary>
+    private static void SeedAdminRoleMenus(ISqlSugarClient db)
+    {
+        var admin = db.Queryable<Role>().Where(x => x.Name == "Admin").First();
+        if (admin is null) return;
+
+        var menuIds = db.Queryable<Menu>().Select(x => x.Id).ToList();
+        if (menuIds.Count == 0) return;
+
+        // ClearFilter 让软删除关联参与判断，避免唯一索引冲突与误复活
+        var linkedIds = db.Queryable<RoleMenu>().ClearFilter()
+            .Where(x => x.RoleId == admin.Id)
+            .Select(x => x.MenuId)
+            .ToList();
+
+        var missing = menuIds.Except(linkedIds)
+            .Select(menuId => new RoleMenu { RoleId = admin.Id, MenuId = menuId })
+            .ToList();
+        // BaseEntity.Id 非自增，必须走雪花 Id 插入（与角色/菜单种子一致）
+        if (missing.Count > 0)
+            db.Insertable(missing).ExecuteReturnSnowflakeIdList();
     }
 
     /// <summary>
