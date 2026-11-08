@@ -17,6 +17,17 @@ Furion 动态 API，路由前缀 `/Api/Menu`。请求体为 JSON；单参数接�
 | GET | `/Api/Menu/GetMenuTree` | Admin | 管理端完整树 |
 | GET | `/Api/Menu/GetMyMenus` | 登录 | 当前用户导航树（已启用 + 侧栏可见 + 非按钮） |
 
+## 角色菜单授权接口
+
+| 方法 | 路径 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| GET | `/Api/RoleMenu/GetRoleMenus?roleId=` | Admin | 返回该角色已绑定的菜单 Id 集合（软删除关联不返回） |
+| POST | `/Api/RoleMenu/SaveRoleMenus` | Admin | 入参 `{ RoleId, MenuIds }`；`MenuIds` 为最终勾选集合，未勾选的绑定会被取消 |
+| GET | `/Api/Role/GetRoleList` | Admin | 角色列表（`Id`、`Name`），供管理端选择角色 |
+
+`SaveRoleMenus` 的父子联动由服务端负责：勾选子级自动补齐所有祖先；相对已有绑定取消父级时，其整棵子树一并取消。
+因此前端提交“最终勾选集合”即可，不需要自行构造祖先。Admin 角色无需绑定，`GetMyMenus` 始终放行全部菜单。
+
 > 实际 HTTP 谓词以 Furion 动态 API 生成结果为准；若框架按动作名前缀推断不一致，以服务端路由为准。
 > 统一结果下业务失败（如删除被拒）HTTP 状态仍为 200，需读取响应体 `Code`/`Succeeded`；鉴权失败才是 HTTP 401/403。
 
@@ -46,7 +57,7 @@ Furion 动态 API，路由前缀 `/Api/Menu`。请求体为 JSON；单参数接�
 - 路径唯一：服务层先校验并给出可读错误，`(ParentId, Path)` 唯一索引兜底并发写入。
 - 删除策略：**拒绝**删除仍有子节点的菜单，需自底向上逐级删除。软删除由全局过滤器自动从查询中排除。
 - 动态树只以 `ParentId=0` 为根；父级被禁用/隐藏时其子级不会提升为顶级，避免出现孤立导航。
-- 角色收窄未接入（本轮无 RoleMenu），扩展点集中在 `MenuService.ApplyRoleFilter` 一处。
+- 角色收窄已接入 `RoleMenu`：Admin 角色兜底放行全部菜单，其他角色按绑定集合过滤；逻辑集中在 `MenuService.ApplyRoleFilter` 一处。
 
 ## 种子数据与部署
 
