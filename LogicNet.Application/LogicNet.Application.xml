@@ -4,9 +4,395 @@
         <name>LogicNet.Application</name>
     </assembly>
     <members>
+        <member name="T:LogicNet.Application.Audit.DTO.AuditLogDateTimeConverter">
+            <summary>
+                审计时间输出为精确到秒的完整时间：全局 JSON 配置只保留日期，无法用于操作追溯。
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Audit.DTO.AuditLogDetailOutputDto">
+            <summary>
+                审计日志详情：在列表字段基础上补充已脱敏、已截断的请求体。
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.AuditLogDetailOutputDto.SqlLogs">
+            <summary>
+                该请求的 SQL 执行明细（已脱敏、截断）；未采集或无明细时为空数组
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Audit.DTO.AuditLogOutputDto">
+            <summary>
+                审计日志列表输出：不含请求体，避免列表响应过大；RequestBody 仅在详情接口返回（且已脱敏）。
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.AuditLogOutputDto.SqlCount">
+            <summary>
+                本次请求执行的 SQL 条数
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.AuditLogOutputDto.SqlElapsedMs">
+            <summary>
+                本次请求 SQL 净耗时合计（毫秒）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.AuditLogOutputDto.SlowSqlCount">
+            <summary>
+                超过慢阈值的 SQL 条数
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.AuditLogOutputDto.CreatedAt">
+            <summary>
+                创建时间（对应实体 CreateTime，精确到秒）
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Audit.DTO.AuditSqlLogOutputDto">
+            <summary>
+                SQL 执行明细输出：SqlText 与 Parameters 在采集阶段已脱敏、截断。
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.AuditSqlLogOutputDto.ErrorMessage">
+            <summary>
+                执行失败原因（已脱敏、截断）；成功执行为 null
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Audit.DTO.SlowSqlOutputDto">
+            <summary>
+                慢 SQL 列表输出：在明细字段基础上补充所属审计记录的请求路径与操作人，便于定位来源。
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Audit.DTO.GetAuditLogListInputDto">
+            <summary>
+                审计日志列表查询：支持时间区间、用户、路径关键字、成功状态与 HTTP 方法过滤。
+                分页沿用 BaseInput 的 PageSize 1-100 钳制。
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.GetAuditLogListInputDto.StartTime">
+            <summary>
+                起始时间（含）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.GetAuditLogListInputDto.EndTime">
+            <summary>
+                结束时间（含）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.GetAuditLogListInputDto.UserId">
+            <summary>
+                操作用户 Id（精确匹配）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.GetAuditLogListInputDto.UserName">
+            <summary>
+                用户名（模糊匹配）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.GetAuditLogListInputDto.Path">
+            <summary>
+                请求路径关键字（模糊匹配）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.GetAuditLogListInputDto.Succeeded">
+            <summary>
+                是否成功
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.GetAuditLogListInputDto.HttpMethod">
+            <summary>
+                HTTP 方法（不区分大小写，如 POST/GET）
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Audit.DTO.GetSlowSqlListInputDto">
+            <summary>
+                慢 SQL 列表查询：支持时间区间与最小耗时过滤，分页沿用 BaseInput 的 1-100 钳制。
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.GetSlowSqlListInputDto.StartTime">
+            <summary>
+                起始时间（含）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.GetSlowSqlListInputDto.EndTime">
+            <summary>
+                结束时间（含）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Audit.DTO.GetSlowSqlListInputDto.MinElapsedMs">
+            <summary>
+                最小耗时（毫秒，含）；未传时默认 200（查询侧兜底，可显式传 0 查看全部明细）
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Audit.Services.AuditLogCleanup">
+            <summary>
+                审计日志清理：按创建时间物理删除（非软删除），可重复执行。
+                管理端清理接口与每日后台任务共用同一实现，避免两套删除条件不一致。
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Audit.Services.AuditLogService">
+            <summary>
+                审计日志查询与清理（仅 Admin）。列表中不返回请求体，详情返回的请求体在采集阶段
+                已完成脱敏与截断，因此接口不会暴露明文密码或令牌。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Audit.Services.AuditLogService.#ctor(SqlSugar.ISqlSugarClient)">
+            <summary>
+                审计日志查询与清理（仅 Admin）。列表中不返回请求体，详情返回的请求体在采集阶段
+                已完成脱敏与截断，因此接口不会暴露明文密码或令牌。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Audit.Services.AuditLogService.GetAuditLogListAsync(LogicNet.Application.Audit.DTO.GetAuditLogListInputDto)">
+            <summary>
+                分页列表：时间区间、用户、路径关键字、成功状态、HTTP 方法过滤（仅 Admin）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Audit.Services.AuditLogService.GetAuditLogDetailAsync(System.Int64)">
+            <summary>
+                详情：包含已脱敏的请求体（仅 Admin）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Audit.Services.AuditLogService.GetSlowSqlListAsync(LogicNet.Application.Audit.DTO.GetSlowSqlListInputDto)">
+            <summary>
+                慢 SQL 列表：按时间区间与最小耗时过滤，附带所属请求的路径与操作人（仅 Admin）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Audit.Services.AuditLogService.CleanupAuditLogsAsync(System.Nullable{System.Int32})">
+            <summary>
+                手动清理入口（幂等）：删除 retentionDays 天前的记录，未传时默认 90 天（仅 Admin）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Captcha.Service.CaptchaService.ValidateAsync(LogicNet.Application.Captcha.DTO.ValidateInputDto)">
+            <summary>
+                独立校验验证码：成功后立即销毁（一次性），与登录链路 captcha.Validate(key, code, true) 行为一致，
+                防止同一验证码被重复用于批量请求
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.BaseInput.PageSize">
+            <summary>
+                每页条数：默认 10，允许调用方配置，钳制在 1-100 防止分页被无限放大拖垮查询
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.BaseInput.PageIndex">
+            <summary>
+                当前页码
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Menu.DTO.AddMenuInputDto">
+            <summary>
+                新增菜单入参
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Menu.DTO.AddMenuInputDto.ParentId">
+            <summary>
+                上级菜单 Id，顶级为 0
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Menu.DTO.AddMenuInputDto.Component">
+            <summary>
+                前端组件标识（目录通常为空）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Menu.DTO.AddMenuInputDto.PermissionCode">
+            <summary>
+                按钮级权限标识
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Menu.DTO.GetMenuListInputDto">
+            <summary>
+                菜单列表查询入参：名称模糊、类型与启用状态过滤，分页复用 BaseInput 的钳制规则
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Menu.DTO.MenuOutputDto">
+            <summary>
+                菜单平铺输出（详情/列表）
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Menu.DTO.MenuTreeOutputDto">
+            <summary>
+                菜单树输出：children 嵌套，同级按 Sort 升序
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Menu.DTO.SaveRoleMenusInputDto">
+            <summary>
+                角色-菜单批量保存入参：MenuIds 为角色最终勾选的菜单集合（未勾选的会取消绑定）。
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Menu.DTO.SaveRoleMenusInputDto.RoleId">
+            <summary>
+                角色 Id
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.Menu.DTO.SaveRoleMenusInputDto.MenuIds">
+            <summary>
+                最终勾选的菜单 Id 集合；空集合表示清空该角色的菜单授权
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Menu.DTO.UpdateMenuInputDto">
+            <summary>
+                编辑菜单入参
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Menu.Services.MenuService">
+            <summary>
+                菜单维护：新增/编辑/删除（软删除）/详情/列表。
+                树查询与当前用户动态加载见 GetMenuTreeAsync / GetMyMenusAsync。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.#ctor(SqlSugar.ISqlSugarClient,Microsoft.AspNetCore.Http.IHttpContextAccessor)">
+            <summary>
+                菜单维护：新增/编辑/删除（软删除）/详情/列表。
+                树查询与当前用户动态加载见 GetMenuTreeAsync / GetMyMenusAsync。
+            </summary>
+        </member>
+        <member name="F:LogicNet.Application.Menu.Services.MenuService.AdminRoleName">
+            <summary>
+                Admin 角色名：与 DatabaseInitializer.DefaultRoles 保持一致
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.CreateMenuAsync(LogicNet.Application.Menu.DTO.AddMenuInputDto)">
+            <summary>
+                新增菜单：校验上级存在且不成环，同一上级下路由路径唯一（仅 Admin）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.UpdateMenuAsync(LogicNet.Application.Menu.DTO.UpdateMenuInputDto)">
+            <summary>
+                编辑菜单：不允许把上级指向自身或自己的后代，避免形成环（仅 Admin）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.DeleteMenuAsync(System.Int64)">
+            <summary>
+                删除菜单（软删除）：存在子节点时拒绝并给出可读提示，需先删除子节点（仅 Admin）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.GetMenuDetailAsync(System.Int64)">
+            <summary>
+                菜单详情（仅 Admin）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.GetMenuListAsync(LogicNet.Application.Menu.DTO.GetMenuListInputDto)">
+            <summary>
+                菜单列表：名称模糊、类型/启用状态过滤，分页复用 BaseInput 的 PageSize 钳制（仅 Admin）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.GetMenuTreeAsync">
+            <summary>
+                管理端菜单树：全部未删除菜单，children 嵌套，同级按 Sort 升序（仅 Admin）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.GetMyMenusAsync">
+            <summary>
+                当前登录用户可访问的导航菜单树：仅已启用、侧栏可见，剔除按钮类型。
+                父级不在结果集内时子级一并舍弃，避免禁用父级后出现孤立的顶级菜单。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.ApplyRoleFilter(SqlSugar.ISugarQueryable{LogicNet.Core.Entity.Menu},System.Int64)">
+            <summary>
+                角色收窄的唯一入口：所有“当前用户可见菜单”的查询都必须经过这里，不要在各查询方法散落权限条件。
+                - Admin 角色兜底放行：不依赖 RoleMenu 绑定，新增菜单也不会把管理员挡在外面；
+                - 其它角色按 RoleMenu 绑定过滤，未绑定任何菜单时返回空。
+                角色以数据库 UserRole/Role 为准（而非仅信任令牌声明），角色调整后无需重新登录即可生效。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.BuildTree(System.Collections.Generic.IEnumerable{LogicNet.Application.Menu.DTO.MenuTreeOutputDto})">
+            <summary>
+                按 ParentId 组装树：先按 Sort/Id 排序，再挂到父节点的 Children，同级顺序天然保持升序。
+                仅 ParentId=0 作为根节点，父节点缺失的子节点不提升为根。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.EnsureParentAsync(System.Int64,System.Int64)">
+            <summary>
+                上级合法性：必须存在（未软删除），且不能是自身或自身后代（防环）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.EnsurePathUniqueAsync(System.Int64,System.String,System.Int64)">
+            <summary>
+                同一上级下路由路径唯一（软删除数据由全局过滤器排除）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.MenuService.IsUniqueKeyConflict(System.Exception)">
+            <summary>
+                唯一索引冲突识别：MySQL 1062 / SQLite UNIQUE constraint（并发写入兜底）
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Menu.Services.RoleMenuService">
+            <summary>
+                角色-菜单绑定的查询与批量保存（仅 Admin）。
+                父子联动规则集中在 SaveRoleMenusAsync：勾子级自动补父级，取消父级级联取消子级。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.RoleMenuService.#ctor(SqlSugar.ISqlSugarClient)">
+            <summary>
+                角色-菜单绑定的查询与批量保存（仅 Admin）。
+                父子联动规则集中在 SaveRoleMenusAsync：勾子级自动补父级，取消父级级联取消子级。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.RoleMenuService.GetRoleMenusAsync(System.Int64)">
+            <summary>
+                查询角色已绑定的菜单 Id 集合（仅 Admin）；菜单软删除后不再返回
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.RoleMenuService.SaveRoleMenusAsync(LogicNet.Application.Menu.DTO.SaveRoleMenusInputDto)">
+            <summary>
+                批量保存角色菜单（仅 Admin）：MenuIds 为最终勾选集合，未勾选的绑定会被取消。
+                联动规则：
+                - 勾选子级自动补齐所有祖先，避免出现“有子无父”的不可达菜单；
+                - 相对已有绑定被取消的菜单，其整棵子树一并取消（取消父级级联取消子级）。
+                返回 true 表示保存成功；无变化时同样返回 true（幂等）。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.RoleMenuService.SaveDiffAsync(System.Int64,System.Collections.Generic.List{System.Int64},System.Collections.Generic.List{System.Int64})">
+            <summary>
+                差量落库：取消绑定走软删除；新增时若命中软删除旧行则恢复，避免唯一索引冲突。
+                批量操作放在同一事务内，避免部分成功导致授权数据不一致。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.RoleMenuService.AddAncestors(System.Collections.Generic.HashSet{System.Int64},System.Collections.Generic.Dictionary{System.Int64,LogicNet.Core.Entity.Menu},System.Int64)">
+            <summary>
+                从指定菜单向上补齐所有祖先；防御性记录已访问节点，避免异常数据成环时死循环。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Menu.Services.RoleMenuService.RemoveSubtree(System.Collections.Generic.HashSet{System.Int64},System.Int64,System.Collections.Generic.Dictionary{System.Int64,System.Collections.Generic.List{System.Int64}})">
+            <summary>
+                从最终集合中剔除指定菜单及其所有后代
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Roles.DTO.RoleOutputDto">
+            <summary>
+                角色列表输出：仅管理端角色选择所需的最小字段
+            </summary>
+        </member>
+        <member name="T:LogicNet.Application.Roles.Services.RoleService">
+            <summary>
+                角色基础信息：供管理端「按角色分配菜单」选择角色使用（仅 Admin）。
+                用户-角色绑定关系不在本服务维护。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Roles.Services.RoleService.#ctor(SqlSugar.ISqlSugarClient)">
+            <summary>
+                角色基础信息：供管理端「按角色分配菜单」选择角色使用（仅 Admin）。
+                用户-角色绑定关系不在本服务维护。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.Roles.Services.RoleService.GetRoleListAsync">
+            <summary>
+                角色列表：按 Id 升序返回未删除角色；Id 由全局序列化器输出为字符串
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.UserInfo.DTO.LoginInputDto.Key">
+            <summary>
+                验证码存储键
+            </summary>
+        </member>
         <member name="P:LogicNet.Application.UserInfo.DTO.LoginInputDto.Code">
             <summary>
-            图形验证码
+                图形验证码
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.UserInfo.DTO.RefreshInputDto.Token">
+            <summary>
+                已过期的访问令牌
+            </summary>
+        </member>
+        <member name="P:LogicNet.Application.UserInfo.DTO.RefreshInputDto.RefreshToken">
+            <summary>
+                刷新令牌
             </summary>
         </member>
         <member name="T:LogicNet.Application.UserInfo.Services.UserInfoService">
@@ -14,9 +400,19 @@
                 用户的逻辑此实例尽量包含所有的CRUD功能。以及Mapper、验证功能。
             </summary>
         </member>
-        <member name="M:LogicNet.Application.UserInfo.Services.UserInfoService.#ctor(SqlSugar.ISqlSugarClient,LogicNet.Core.Repository{LogicNet.Core.Entity.UserInfo})">
+        <member name="M:LogicNet.Application.UserInfo.Services.UserInfoService.#ctor(SqlSugar.ISqlSugarClient,LogicNet.Core.Repository{LogicNet.Core.Entity.UserInfo},Lazy.Captcha.Core.ICaptcha)">
             <summary>
                 用户的逻辑此实例尽量包含所有的CRUD功能。以及Mapper、验证功能。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.UserInfo.Services.UserInfoService.RefreshAsync(LogicNet.Application.UserInfo.DTO.RefreshInputDto)">
+            <summary>
+                刷新令牌：用过期的访问令牌 + 刷新令牌换取新访问令牌，刷新令牌同步轮换（经 x-access-token 响应头下发）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Application.UserInfo.Services.UserInfoService.LogoutAsync">
+            <summary>
+                登出：吊销当前访问令牌（以及请求头 x-access-token 随附的刷新令牌），吊销后令牌到期前调用接口将返回 401
             </summary>
         </member>
     </members>

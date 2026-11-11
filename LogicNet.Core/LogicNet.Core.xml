@@ -4,9 +4,348 @@
         <name>LogicNet.Core</name>
     </assembly>
     <members>
+        <member name="T:LogicNet.Core.Audit.AuditLogSanitizer">
+            <summary>
+                审计日志脱敏与截断：请求体、查询串、异常消息在落库前统一处理。
+                目标是不让 password / accessToken / refreshToken / authorization / code（验证码）等
+                敏感键值以明文进入数据库或日志。
+            </summary>
+        </member>
+        <member name="F:LogicNet.Core.Audit.AuditLogSanitizer.Mask">
+            <summary>
+                掩码占位符
+            </summary>
+        </member>
+        <member name="M:LogicNet.Core.Audit.AuditLogSanitizer.SanitizeBody(System.String,System.Int32)">
+            <summary>
+                请求体脱敏：合法 JSON 按字段递归掩码，非法 JSON 退回正则掩码，最后按 maxLength 截断
+            </summary>
+        </member>
+        <member name="M:LogicNet.Core.Audit.AuditLogSanitizer.SanitizeText(System.String,System.Int32)">
+            <summary>
+                查询串/异常消息等文本脱敏（不要求 JSON 结构），并截断
+            </summary>
+        </member>
+        <member name="M:LogicNet.Core.Audit.AuditLogSanitizer.Truncate(System.String,System.Int32)">
+            <summary>
+                按字符数截断，超出部分以固定后缀标记，保证结果长度不超过 maxLength
+            </summary>
+        </member>
+        <member name="M:LogicNet.Core.Audit.AuditLogSanitizer.IsSensitiveName(System.String)">
+            <summary>
+                判断 SQL 参数名是否敏感：去掉 @/: /? 前缀后按完整名或敏感片段匹配。
+                code/verifyCode/captchaCode 等验证码键会被掩码，permissionCode/roleCode/orderCode
+                等业务编码保留原值。用于在拼接参数列表前直接掩码参数值（如 @newPassword），比事后正则匹配更可靠。
+            </summary>
+        </member>
         <member name="T:LogicNet.Core.DbContext">
             <summary>
             数据库上下文对象
+            </summary>
+        </member>
+        <member name="T:LogicNet.Core.Entity.AuditLog">
+            <summary>
+                操作审计日志：由中间件在请求完成后异步落库，不侵入业务 Controller。
+                时间字段直接复用 BaseEntity 的 CreateTime（对外 DTO 命名为 CreatedAt）；
+                RequestBody 与 QueryString 在写入前已完成脱敏与截断，库中不保存明文密码/令牌。
+            </summary>
+            <remarks>
+                本表只追加不修改，IsDelete 仅因继承 BaseEntity 而存在；过期数据由清理任务物理删除。
+            </remarks>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.UserId">
+            <summary>
+                操作用户 Id；未认证请求为 null
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.UserName">
+            <summary>
+                操作用户名；未认证请求记录为 anonymous
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.HttpMethod">
+            <summary>
+                HTTP 方法
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.Path">
+            <summary>
+                请求路径（不含查询串）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.QueryString">
+            <summary>
+                查询串（已脱敏、截断）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.RequestBody">
+            <summary>
+                请求体（已脱敏、截断，最多 MaxBodyLength 字符）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.StatusCode">
+            <summary>
+                HTTP 响应状态码
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.ResultCode">
+            <summary>
+                业务结果码：优先取统一结果的业务码（业务失败可能 HTTP 200 但 ResultCode 为 4xx），
+                未经过统一结果处理时与 StatusCode 一致
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.Succeeded">
+            <summary>
+                请求是否成功：优先取统一结果的业务成功状态；未经过统一结果时为
+                “状态码小于 400 且未抛出异常”
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.ClientIp">
+            <summary>
+                客户端 IP：优先取 X-Forwarded-For 首值，否则 RemoteIpAddress
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.UserAgent">
+            <summary>
+                User-Agent（截断）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.TraceId">
+            <summary>
+                请求链路 Id，与响应头 x-request-id、文件日志 TraceId 同源
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.DurationMs">
+            <summary>
+                请求耗时（毫秒）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.ExceptionMessage">
+            <summary>
+                未处理异常消息（已脱敏、截断）；正常请求为 null
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.SqlCount">
+            <summary>
+                本次请求执行的 SQL 条数（含未记录明细的快速读 SQL）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.SqlElapsedMs">
+            <summary>
+                本次请求 SQL 净耗时合计（毫秒，不含业务代码耗时）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.SlowSqlCount">
+            <summary>
+                本次请求中超过慢阈值（AuditLog.Sql.SlowThresholdMs）的 SQL 条数
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditLog.SqlLogs">
+            <summary>
+                请求内采集到的 SQL 明细，仅内存传递，不落 AuditLog 表；
+                由 AuditLogPersister 统一写入 AuditSqlLog 表
+            </summary>
+        </member>
+        <member name="T:LogicNet.Core.Entity.AuditSqlLog">
+            <summary>
+                审计 SQL 执行明细：与 AuditLog 一请求一对多，随审计记录一起异步落库与清理。
+                SqlText 与 Parameters 在采集阶段已完成脱敏与截断，库中不保存明文密码/令牌。
+            </summary>
+            <remarks>
+                AuditLogId 关联 AuditLog.Id；TraceId 冗余便于按链路直接检索。时间复用 BaseEntity 的
+                CreateTime（对外 DTO 命名为 CreatedAt），并与所属审计记录保持同一时刻。
+            </remarks>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditSqlLog.AuditLogId">
+            <summary>
+                所属审计记录 Id
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditSqlLog.TraceId">
+            <summary>
+                请求链路 Id，与所属 AuditLog.TraceId 一致
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditSqlLog.SqlText">
+            <summary>
+                执行的 SQL 文本（已脱敏、截断）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditSqlLog.Parameters">
+            <summary>
+                参数列表（键值对形式，敏感参数值已掩码，整体截断）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditSqlLog.ElapsedMs">
+            <summary>
+                单条 SQL 净耗时（毫秒）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditSqlLog.IsSlow">
+            <summary>
+                是否超过慢阈值（AuditLog.Sql.SlowThresholdMs）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.AuditSqlLog.ErrorMessage">
+            <summary>
+                执行失败原因（已脱敏、截断）；成功执行为 null
+            </summary>
+        </member>
+        <member name="T:LogicNet.Core.Entity.IDeleteFilter">
+            <summary>
+            软删除标记接口。实现该接口的实体在查询时会被全局过滤器自动追加 IsDelete = false 条件
+            （过滤器注册见 LogicNet.Web.Core/Startup.cs 的 SqlSugar 配置）。
+            </summary>
+        </member>
+        <member name="T:LogicNet.Core.Entity.MenuType">
+            <summary>
+                菜单类型：目录不承载页面，菜单对应前端路由，按钮仅承载权限标识
+            </summary>
+        </member>
+        <member name="T:LogicNet.Core.Entity.Menu">
+            <summary>
+                菜单/路由/按钮权限定义。ParentId 为 0 表示顶级；软删除与审计字段来自 BaseEntity。
+            </summary>
+            <remarks>
+                Path 在同一上级下唯一：服务层先做可读校验，数据库唯一索引兜底并发写入。
+                注意软删除行仍占用唯一索引（与 UserInfo 的历史约定一致），删除后同路径需换路径或物理清理。
+            </remarks>
+        </member>
+        <member name="P:LogicNet.Core.Entity.Menu.ParentId">
+            <summary>
+                上级菜单 Id，顶级为 0
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.Menu.Name">
+            <summary>
+                显示名称
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.Menu.Path">
+            <summary>
+                前端路由路径
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.Menu.Component">
+            <summary>
+                前端组件标识（目录通常为空）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.Menu.Icon">
+            <summary>
+                图标标识
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.Menu.Sort">
+            <summary>
+                同级排序，升序
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.Menu.Type">
+            <summary>
+                菜单类型
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.Menu.PermissionCode">
+            <summary>
+                权限标识（按钮级权限使用）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.Menu.IsEnabled">
+            <summary>
+                是否启用
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.Menu.IsVisible">
+            <summary>
+                是否在侧栏导航中显示
+            </summary>
+        </member>
+        <member name="T:LogicNet.Core.Entity.RoleMenu">
+            <summary>
+                角色-菜单关联：角色可见/可访问的菜单集合。
+                Admin 角色的全量权限由代码层兜底（见 MenuService.ApplyRoleFilter），本表为其它角色的授权依据。
+            </summary>
+            <remarks>
+                (RoleId, MenuId) 唯一：服务层批量保存前先查重，数据库唯一索引兜底并发写入。
+                注意软删除行仍占用唯一索引，重新勾选时按“恢复”处理而非重新插入（见 RoleMenuService）。
+            </remarks>
+        </member>
+        <member name="P:LogicNet.Core.Entity.RoleMenu.RoleId">
+            <summary>
+                角色 Id
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.RoleMenu.MenuId">
+            <summary>
+                菜单 Id
+            </summary>
+        </member>
+        <member name="T:LogicNet.Core.Entity.UserRole">
+            <summary>
+                用户-角色关联
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.UserRole.UserId">
+            <summary>
+                用户 Id
+            </summary>
+        </member>
+        <member name="P:LogicNet.Core.Entity.UserRole.RoleId">
+            <summary>
+                角色 Id
+            </summary>
+        </member>
+        <member name="T:LogicNet.Core.Security.JwtClaimNames">
+            <summary>
+                JWT 声明名统一定义（登录颁发、鉴权校验、审计字段读取均以此处常量为准）
+            </summary>
+        </member>
+        <member name="F:LogicNet.Core.Security.JwtClaimNames.UserId">
+            <summary>
+                用户 Id
+            </summary>
+        </member>
+        <member name="F:LogicNet.Core.Security.JwtClaimNames.Account">
+            <summary>
+                登录账号
+            </summary>
+        </member>
+        <member name="T:LogicNet.Core.Security.PasswordHasher">
+            <summary>
+                密码哈希（PBKDF2-SHA256 随机盐）。历史无盐 MD5 存储可校验，校验通过后应透明迁移为新格式。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Core.Security.PasswordHasher.Hash(System.String)">
+            <summary>
+                生成加盐哈希，格式：PBKDF2$迭代次数$盐(Base64)$哈希(Base64)
+            </summary>
+        </member>
+        <member name="M:LogicNet.Core.Security.PasswordHasher.Verify(System.String,System.String)">
+            <summary>
+                校验密码。兼容历史无盐 MD5（32 位十六进制）存储。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Core.Security.PasswordHasher.NeedsUpgrade(System.String)">
+            <summary>
+                存储值是否需要升级为加盐哈希（历史 MD5 需迁移）
+            </summary>
+        </member>
+        <member name="T:LogicNet.Core.Security.TokenRevocationStore">
+            <summary>
+                令牌吊销存储（进程内实现）。多实例部署时需替换为分布式实现（如 Redis），否则吊销仅对单实例生效。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Core.Security.TokenRevocationStore.Revoke(System.String,System.DateTime)">
+            <summary>
+                吊销令牌，记录保留至令牌自身过期时间点
+            </summary>
+            <param name="token">完整令牌字符串</param>
+            <param name="expireAtUtc">令牌过期时间（UTC）</param>
+        </member>
+        <member name="M:LogicNet.Core.Security.TokenRevocationStore.IsRevoked(System.String)">
+            <summary>
+                令牌是否已被吊销（已过期的吊销记录视为无效并顺手移除）
             </summary>
         </member>
     </members>

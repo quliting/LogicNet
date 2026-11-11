@@ -411,3 +411,9 @@ secrets.json
 
 # 前端仓库（vben 独立 git 仓库，避免嵌套仓库被后端误提交）
 /Front/
+
+# 飞书 agent 桥接：本地配置、运行态与日志不入库
+scripts/feishu-agent/config.json
+scripts/feishu-agent/run/
+scripts/feishu-agent/logs/
+scripts/feishu-agent/queue/

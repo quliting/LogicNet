@@ -4,6 +4,294 @@
         <name>LogicNet.Web.Core</name>
     </assembly>
     <members>
+        <member name="T:LogicNet.Web.Core.Audit.AuditLogCleanupHostedService">
+            <summary>
+                审计日志每日清理：本地时间 CleanupHour 点执行一次，按 RetentionDays 物理删除过期记录。
+                独立于 IDeleteDirJob（后者 60 秒一次、只清理临时文件），不会每分钟扫审计表。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.Audit.AuditLogCleanupHostedService.ComputeDelayUntilNextRun(System.DateTime,System.Int32)">
+            <summary>
+                计算距离下一次清理时刻的等待时长；已过当天时刻则顺延到次日。
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.Audit.AuditLogContextKeys">
+            <summary>
+                统一结果与审计中间件之间的轻量传递键：由 IUnifyResultProvider 写入，中间件读取，
+                用于记录业务结果码与真实成功状态（HTTP 200 也可能表示业务失败）。
+            </summary>
+        </member>
+        <member name="F:LogicNet.Web.Core.Audit.AuditLogContextKeys.SqlCollector">
+            <summary>
+                当前请求的 SQL 采集缓冲区；仅本请求可见，AOP 钩子通过 HttpContext.Items 取用，
+                天然把同一请求内的多条 SQL 归到同一审计记录，不会串到其他请求
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.Audit.AuditLogMiddleware">
+            <summary>
+                操作审计中间件：在请求完成后采集方法、路径、状态码、用户、耗时与脱敏后的请求体，
+                非阻塞入队后交给后台服务落库。任何采集/入队异常都只记日志，绝不影响业务响应。
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.Audit.AuditLogOptions">
+            <summary>
+                操作审计采集配置（appsettings 节点 AuditLog）。默认只记录写操作与登录类接口，
+                避免 GET/静态资源把日志量放大；所有项都可以通过配置覆盖。
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditLogOptions.Enabled">
+            <summary>
+                总开关：关闭后中间件直接放行，不采集任何请求
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditLogOptions.IncludeGet">
+            <summary>
+                是否记录 GET 请求（默认关闭，需要全量留痕时开启）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditLogOptions.RecordLoginEndpoints">
+            <summary>
+                是否记录登录/注册/刷新/登出等认证类接口（即使方法不是写操作）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditLogOptions.RecordRequestBody">
+            <summary>
+                是否记录请求体（关闭后 RequestBody 恒为空）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditLogOptions.MaxBodyLength">
+            <summary>
+                请求体最大记录长度（字符），超出截断
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditLogOptions.MaxQueryStringLength">
+            <summary>
+                查询串最大记录长度（字符），超出截断
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditLogOptions.MaxExceptionLength">
+            <summary>
+                异常消息最大记录长度（字符），超出截断
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditLogOptions.SkipPaths">
+            <summary>
+                不采集的路径前缀（大小写不敏感）。健康检查与审计查询接口自身默认跳过，避免自我放大。
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditLogOptions.QueueCapacity">
+            <summary>
+                写入队列容量：满时丢弃新记录并记 Warning，保证不阻塞请求线程
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditLogOptions.RetentionDays">
+            <summary>
+                数据保留天数（每日清理任务使用，默认 90 天）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditLogOptions.CleanupHour">
+            <summary>
+                每日清理执行时刻（0-23，本地时间，默认凌晨 3 点）
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditLogOptions.Sql">
+            <summary>
+                SQL 执行明细采集配置（节点 AuditLog.Sql）
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.Audit.AuditLogPersister">
+            <summary>
+                审计日志落库：批量插入，任何失败都只返回 false 并记录 Error，不向调用方抛出。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.Audit.AuditLogPersister.PersistSqlLogsAsync(SqlSugar.ISqlSugarClient,System.Collections.Generic.IReadOnlyCollection{LogicNet.Core.Entity.AuditLog},Microsoft.Extensions.Logging.ILogger)">
+            <summary>
+                写入 SQL 明细：回填所属审计 Id 与链路 Id，按 200 条分块避免单次报文过大；
+                失败仅记录 Error，不影响已写入的审计主记录。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.Audit.AuditLogPersister.EnsureTable(SqlSugar.ISqlSugarClient)">
+            <summary>
+                首次写入前补建表结构：后台写入服务可能早于启动期的 DatabaseInitializer 开始工作，
+                幂等建表可避免首批日志因缺表全部丢失。失败时不置位，下一批自动重试。
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.Audit.AuditLogQueue">
+            <summary>
+                审计日志写入队列：请求线程只做一次非阻塞 TryWrite，真正的数据库写入由后台服务完成。
+                队列满时丢弃新记录并记录 Warning，绝不阻塞响应。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.Audit.AuditLogQueue.Enqueue(LogicNet.Core.Entity.AuditLog)">
+            <summary>
+                非阻塞入队；队列满时返回 false（记录被丢弃，调用方无需处理）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.Audit.AuditLogQueue.TryDequeue(LogicNet.Core.Entity.AuditLog@)">
+            <summary>
+                尝试取出一条记录（后台批量写入时用于攒批，测试中用于断言采集结果）
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.Audit.AuditLogWriterHostedService">
+            <summary>
+                审计日志后台写入：从队列攒批（最多 100 条）后在独立作用域内落库，
+                数据库异常只记日志，不影响请求线程；进程退出时队列中未消费的记录允许丢失。
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.Audit.AuditSqlCapture">
+            <summary>
+                SqlSugar AOP 到审计采集之间的桥：只从当前 HttpContext 取当前请求的采集缓冲区。
+            </summary>
+            <remarks>
+                关联依据是 HttpContext.Items，因此同一请求内的 SQL 一定落到同一个缓冲区。
+                后台任务、定时任务没有 HttpContext（或请求已结束、缓冲区已关闭）时直接跳过，
+                不会误挂到其他请求的审计记录上。
+            </remarks>
+        </member>
+        <member name="M:LogicNet.Web.Core.Audit.AuditSqlCapture.Capture(System.String,System.Object,System.TimeSpan,Microsoft.AspNetCore.Http.IHttpContextAccessor,System.String)">
+            <summary>
+                parameters 使用 object 以兼容 SqlSugar 异常对象的 Parametres 属性（运行时类型可能是数组或集合）。
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.Audit.AuditSqlCaptureItem">
+            <summary>
+                单条 SQL 采集结果（脱敏、截断后），仅内存传递。
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditSqlCaptureItem.ErrorMessage">
+            <summary>
+                执行失败原因（已脱敏、截断）；成功执行为 null
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.Audit.AuditSqlSnapshot">
+            <summary>
+                请求结束时的 SQL 采集快照：汇总计数用于 AuditLog，明细用于 AuditSqlLog。
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.Audit.AuditSqlCollector">
+            <summary>
+                请求内 SQL 采集缓冲：AOP 钩子只做内存追加，不访问数据库，不抛异常。
+            </summary>
+            <remarks>
+                记录范围（默认）：只记录达到慢阈值的 SQL 与执行失败的 SQL；RecordAll=true 时记录全部 SQL。
+                无论是否记录明细，都会累计执行条数、净耗时与慢 SQL 条数，用于审计汇总字段。
+                明细条数达到上限后停止追加，并在快照末尾追加一条“已截断”标记。
+            </remarks>
+        </member>
+        <member name="M:LogicNet.Web.Core.Audit.AuditSqlCollector.#ctor(LogicNet.Web.Core.Audit.AuditSqlOptions,System.Boolean)">
+            <summary>
+                forceSlowOnly：仅保留慢 SQL/失败 SQL 明细（忽略 RecordAll）。用于“慢 GET 探测”——
+                这类请求默认不落审计主记录，没必要为它们全量格式化每条 SQL
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.Audit.AuditSqlCollector.Add(System.String,SqlSugar.SugarParameter[],System.Int64,System.String)">
+            <summary>
+                追加一条 SQL 执行记录；失败 SQL 通过 errorMessage 传入（不依赖是否超阈值，必记录）。
+                采集异常一律吞掉，绝不影响业务 SQL 执行。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.Audit.AuditSqlCollector.Close">
+            <summary>
+                关闭采集并生成快照：此后到达的 SQL（例如请求结束后仍在运行的异步任务）不会再被归属。
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.Audit.AuditSqlOptions">
+            <summary>
+                SQL 执行明细采集配置（appsettings 节点 AuditLog.Sql）。
+                默认只记录超过慢阈值的语句与执行失败的语句，避免正常接口把明细表放大；
+                临时排查接口时可打开 RecordAll 记录全部 SQL，无需发版。
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditSqlOptions.Enabled">
+            <summary>
+                明细采集开关：关闭后仍保留 AuditLog 的汇总字段（为 0），不产生 AuditSqlLog 记录
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditSqlOptions.RecordAll">
+            <summary>
+                是否记录全部 SQL（默认关闭）。关闭时只记录慢 SQL 与执行失败的 SQL；
+                临时排查接口问题时可改为 true，但会显著增加明细数据量
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditSqlOptions.SlowThresholdMs">
+            <summary>
+                慢 SQL 阈值（毫秒）：达到或超过该值的语句标记为慢 SQL 并写入明细（不限请求方法）。
+                默认 500ms：NAS 上常规写菜单约 220-300ms，200ms 会产生大量无意义慢 SQL 噪音；
+                排查时可临时调低（如 100ms），改完即可观察命中情况
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditSqlOptions.AuditSlowGet">
+            <summary>
+                慢 GET 入审计（默认开启）：GET 请求本身不生成审计主记录（除非 IncludeGet=true），
+                但当请求内出现达到慢阈值的 SQL 时，单独生成一条审计记录以便追溯慢查询。
+                false 时保持旧行为：GET 完全不记录。仅在 Sql.Enabled=true 时生效
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditSqlOptions.MaxSqlLength">
+            <summary>
+                单条 SQL 文本最大长度（字符），超出截断
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditSqlOptions.MaxParametersLength">
+            <summary>
+                单条 SQL 参数列表最大长度（字符），超出截断
+            </summary>
+        </member>
+        <member name="P:LogicNet.Web.Core.Audit.AuditSqlOptions.MaxItemsPerAuditLog">
+            <summary>
+                单条审计记录的明细条数上限；超出部分不再记录，并追加一条“已截断”标记明细
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.DatabaseInitializer">
+            <summary>
+                数据库初始化：CodeFirst 建表（含实体声明的索引）+ 幂等种子数据。
+                全新环境一键就绪；已有库仅同步缺失列，不改动既有列/索引（存量库的唯一索引见 Sql/ 幂等脚本）。
+            </summary>
+        </member>
+        <member name="F:LogicNet.Web.Core.DatabaseInitializer.DefaultRoles">
+            <summary>
+                基础角色种子（配合登录时写入令牌的角色声明与 [Authorize(Roles = ...)]）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.DatabaseInitializer.SeedAdminRoleMenus(SqlSugar.ISqlSugarClient)">
+            <summary>
+                Admin 角色关联全部存量菜单：数据层与代码层兜底保持一致。
+                仅补插缺失关联（含软删除行的判断），不复活管理员主动取消的绑定；
+                后续新增菜单由 MenuService.ApplyRoleFilter 的 Admin 兜底保证可见。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.DatabaseInitializer.SeedMenus(SqlSugar.ISqlSugarClient)">
+            <summary>
+                最小菜单种子：系统管理（目录）→ 菜单管理（菜单），可重复执行。
+                已软删除的种子菜单不会被重新插入，避免重启覆盖管理员删除意图。
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.DatabaseHealthCheck">
+            <summary>
+                数据库连通性健康检查：执行 SELECT 1 探活，失败返回 Unhealthy（/health 整体 503）
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.DatabaseHealthCheck.#ctor(SqlSugar.ISqlSugarClient)">
+            <summary>
+                数据库连通性健康检查：执行 SELECT 1 探活，失败返回 Unhealthy（/health 整体 503）
+            </summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.HighRiskEndpointRateLimit">
+            <summary>
+                匿名/高风险接口限流规则（按客户端 IP 固定窗口）。仅匹配指定路径段，其余请求不限流。
+                路径段与 DynamicApiControllerSettings（KeepName=true、LowercaseRoute=false）生成的路由保持一致。
+            </summary>
+        </member>
+        <member name="F:LogicNet.Web.Core.HighRiskEndpointRateLimit.Rules">
+            <summary>
+                规则：路径段（不区分大小写的前缀匹配）+ 窗口内允许次数 + 窗口时长
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.HighRiskEndpointRateLimit.Match(Microsoft.AspNetCore.Http.PathString)">
+            <summary>
+                命中规则时返回规则索引，未命中返回 -1
+            </summary>
+        </member>
         <member name="P:LogicNet.Web.Core.TemplateRestfulResult`1.Data">
             <summary>
                 数据
@@ -54,6 +342,12 @@
             <param name="unifyResultSettings"></param>
             <returns></returns>
         </member>
+        <member name="M:LogicNet.Web.Core.TemplateRestfulResultProvider.WriteAuditResult(Microsoft.AspNetCore.Http.HttpContext,System.Int32,System.Boolean)">
+            <summary>
+                把业务结果码与成功状态写入 HttpContext.Items，供审计中间件采集；
+                不改变原响应结构，未经过统一结果处理的请求仍回退到 HTTP 状态码。
+            </summary>
+        </member>
         <member name="M:LogicNet.Web.Core.TemplateRestfulResultProvider.LogicRESTfulResult(System.Int32,System.Boolean,System.Object,System.Object)">
             <summary>
                 返回 RESTful 风格结果集
@@ -63,6 +357,50 @@
             <param name="data"></param>
             <param name="errors"></param>
             <returns></returns>
+        </member>
+        <member name="T:LogicNet.Web.Core.Id.IdGeneratorSetup">
+            <summary>
+                雪花 Id 的唯一初始化入口。
+                WorkerId 必须“每实例唯一且重启稳定”：优先读取显式配置/环境变量，
+                未配置时按主机名做稳定哈希推导（不要用 string.GetHashCode，进程间随机化）。
+                BaseTime 固定，重建容器或重启进程后时间戳基准不漂移。
+            </summary>
+        </member>
+        <member name="F:LogicNet.Web.Core.Id.IdGeneratorSetup.WorkerIdBitLength">
+            <summary>WorkerId 位数（与既有数据一致，不可随意改动，否则新旧 Id 可能重叠）。</summary>
+        </member>
+        <member name="F:LogicNet.Web.Core.Id.IdGeneratorSetup.SeqBitLength">
+            <summary>序列号位数：64 个/毫秒，超出后由 Yitter 漂移算法顺延毫秒，不会重复。</summary>
+        </member>
+        <member name="F:LogicNet.Web.Core.Id.IdGeneratorSetup.WorkerIdCount">
+            <summary>可用 WorkerId 个数：1024。</summary>
+        </member>
+        <member name="F:LogicNet.Web.Core.Id.IdGeneratorSetup.MaxWorkerId">
+            <summary>WorkerId 合法上限：1023。</summary>
+        </member>
+        <member name="F:LogicNet.Web.Core.Id.IdGeneratorSetup.BaseTime">
+            <summary>固定时间基准（沿用 2025-05-04，不可修改）。</summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.Id.IdGeneratorSetup.ResolveWorkerId(System.String,System.String)">
+            <summary>
+                解析 WorkerId：显式值优先并做范围校验，未配置时按主机名推导。
+                越界/非整数直接抛出，避免带病启动（多副本时重复 WorkerId 会造成主键冲突）。
+            </summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.Id.IdGeneratorSetup.DeriveWorkerId(System.String)">
+            <summary>按主机名做 FNV-1a 稳定哈希，映射到 0-1023。</summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.Id.IdGeneratorSetup.Configure(System.Int32)">
+            <summary>初始化 Yitter 全局生成器（应用启动时调用一次）。</summary>
+        </member>
+        <member name="M:LogicNet.Web.Core.Id.IdGeneratorSetup.DecodeWorkerId(System.Int64)">
+            <summary>从生成的 Id 中还原 WorkerId（用于自检与测试）。</summary>
+        </member>
+        <member name="T:LogicNet.Web.Core.Json.LongToStringJsonConverter">
+            <summary>
+                long 统一序列化为 JSON 字符串：雪花 Id 已接近 2^53（JS Number.MAX_SAFE_INTEGER），
+                继续按数字输出会在前端丢精度。反序列化兼容数字与字符串，旧客户端不受影响。
+            </summary>
         </member>
     </members>
 </doc>
