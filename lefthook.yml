@@ -1,0 +1,44 @@
+# 钩子分工（详细说明见 docs/src/guide/project/standard.md）：
+# - pre-commit：仅对暂存文件做 lint 与格式化（秒级）。
+# - pre-push：全仓 typecheck（除 tsconfig/commitlint-config/stylelint-config
+#   三个纯配置包外均已声明脚本；turbo 缓存命中时秒级；紧急逃生可用
+#   LEFTHOOK=0 git push）。
+# 配置说明：https://lefthook.dev/configuration/
+
+pre-commit:
+  # 串行执行（不设 parallel）：多个 --fix job 会写文件并 stage_fixed 回填，
+  # 并行会产生竞态；lint 仅检查暂存文件，负载可控。
+  # oxlint 的类型感知通道由 .oxlintrc 根配置 options.typeAware 统一开启，
+  # CLI 不再传 --type-aware（单一真源）。
+  jobs:
+    - name: oxlint
+      glob: '*.{js,jsx,ts,tsx,vue,cjs,mjs,cts,mts}'
+      run: pnpm exec oxlint --fix --threads=4 --no-error-on-unmatched-pattern {staged_files}
+      stage_fixed: true
+    - name: oxfmt
+      glob: '*.{js,jsx,ts,tsx,vue,cjs,mjs,cts,mts,json,jsonc,md}'
+      run: pnpm exec oxfmt --threads=4 --no-error-on-unmatched-pattern {staged_files}
+      stage_fixed: true
+    - name: eslint
+      glob: '*.{js,jsx,ts,tsx,vue,cjs,mjs,cts,mts}'
+      run: pnpm exec eslint --fix {staged_files}
+      stage_fixed: true
+    - name: stylelint
+      glob: '*.{vue,css,less,scss}'
+      run: pnpm exec stylelint --fix {staged_files}
+      stage_fixed: true
+
+pre-push:
+  jobs:
+    - name: typecheck
+      run: pnpm check:type
+
+post-merge:
+  commands:
+    install:
+      run: pnpm install
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit $1
